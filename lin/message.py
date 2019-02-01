@@ -40,18 +40,40 @@ class Message(object):
     def frameId(self):
         return self.__frameId
 
+    @frameId.setter
+    def frameId(self, value):
+        self.__frameId = value
+
     @property
     def pid(self):
         return self.__PID
+
+    @pid.setter
+    def pid(self, value):
+        self.__PID = value
 
     @property
     def frameType(self):
         return self.__frameType
 
+    @frameType.setter
+    def frameType(self, value):
+        self.__frameType = value
+
     @property
     def data(self):
         return self.__data
 
+    @data.setter
+    def data(self, value):
+        if len(value) != self.__length:
+            self.__length = len(value)
+        self.__data = value
+
     @property
     def length(self):
         return self.__length
+
+    @length.setter
+    def length(self, value):
+        self.__length = value

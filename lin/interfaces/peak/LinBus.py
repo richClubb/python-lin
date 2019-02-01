@@ -1,17 +1,10 @@
 from lin import PLinApi
 from ctypes import *
 from threading import Thread
+from lin.message import Message
+from lin.linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes
 
-
-class LinMessage(object):
-
-    def __init__(self):
-
-        self.frameId = 0
-        self.protectedId = 0
-        self.payload = [0, 0, 0, 0, 0, 0, 0, 0]
-
-
+# todo: file needs rename to PLinBus
 class LinBus(object):
 
     def __init__(self, baudrate):
@@ -24,6 +17,7 @@ class LinBus(object):
         self.HwMode = PLinApi.TLIN_HARDWAREMODE_MASTER
         self.HwBaudrate = c_ushort(baudrate)
 
+        # necessary to set up the connection
         result = self.bus.RegisterClient("Embed Master", None, self.hClient)
         if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
 
@@ -38,6 +32,7 @@ class LinBus(object):
         if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering frame id client")
 
         # configure schedule
+        # todo: get this out of the class this is unnecessary
         masterRequestScheduleSlot = PLinApi.TLINScheduleSlot()
         masterRequestScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_MASTER_REQUEST
         masterRequestScheduleSlot.Delay = 10
@@ -68,12 +63,11 @@ class LinBus(object):
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
 
-        result = self.bus.SetSchedule(self.hClient, self.hHw, 1, diagSchedule, 2)
-
         self.receiveThread = Thread(group=None, target=self.receiveFunction, name="Receive Thread")
 
         self.receiveThreadActive = False
 
+    # todo: this should just be recv?
     def receiveFunction(self):
 
         recvMessage = PLinApi.TLINRcvMsg()
@@ -84,7 +78,7 @@ class LinBus(object):
             if result == PLinApi.TLIN_ERROR_OK:
 
                 if recvMessage.ErrorFlags == PLinApi.TLIN_MSGERROR_OK:
-                    msg = LinMessage()
+                    msg = Message()
                     msg.frameId = recvMessage.FrameId
                     if recvMessage.FrameId == 125:
                         msg.frameId = 0x3D
@@ -100,6 +94,7 @@ class LinBus(object):
         print("FrameID: {0}".format(msg.frameId))
         print(msg.payload)
 
+    # todo: this should be more generic
     def startDiagnosticSchedule(self):
 
         result = self.bus.StartSchedule(self.hClient, self.hHw, 1)
@@ -108,6 +103,7 @@ class LinBus(object):
         self.receiveThreadActive = True
         self.receiveThread.start()
 
+    # todo: this should be re-factored
     def sendMasterRequest(self, payload):
 
         dataLength = len(payload)
@@ -121,6 +117,7 @@ class LinBus(object):
 
         self.bus.UpdateByteArray(self.hClient, self.hHw, 0x3C, 0, 8, data)
 
+    # todo: should be renamed disconnect
     def closeConnection(self):
 
         self.receiveThreadActive = False
@@ -133,9 +130,37 @@ class LinBus(object):
         self.bus.ResetHardwareConfig(self.hClient, self.hHw)
         self.bus.RemoveClient(self.hClient)
 
+    # todo: should be named wakeupBus
     def wakeup(self):
 
         self.bus.XmtWakeUp(self.hClient, self.hHw)
+
+    # this function converts the schedule from the python-lin to the bus version
+    def addSchedule(self, schedule, scheduleIndex):
+
+        # creates the diagnostic schedule
+        diagSchedule = (PLinApi.TLINScheduleSlot * schedule.size)()
+
+        for i in range(schedule.size):
+            scheduleSlot = schedule.frameSlots[i]
+            outputScheduleSlot = PLinApi.TLINScheduleSlot()
+
+            if scheduleSlot.frameType == FrameTypes.MASTER_REQUEST:
+                pass
+            elif scheduleSlot.frameType == FrameTypes.SLAVE_RESPONSE:
+                pass
+
+
+
+            ## set the schedule slot types
+            diagSchedule[i] = outputScheduleSlot
+
+        # add the schedule to the hardware
+        result = self.bus.SetSchedule(self.hClient, self.hHw, scheduleIndex, diagSchedule, schedule.size)
+        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error adding schedule table")
+
+
+
 
 if __name__ == "__main__":
 
