@@ -65,6 +65,12 @@ class LinBus(object):
         slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
         slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
 
+        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
+        slaveResponseFrameEntry.FrameId = c_ubyte(0x3d)
+        slaveResponseFrameEntry.Length = c_ubyte(8)
+        slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
+        slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_ENHANCED
+
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
 
