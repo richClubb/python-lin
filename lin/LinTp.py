@@ -1,3 +1,8 @@
+
+# THIS IS CURRENTLY A COPY OF PEAK/LinBus.py - copied to here see that any general transport level methods can be kept apart from the lower level bus API impls
+# THIS IS A WIP - only just looking at this and considering at present!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 from lin import PLinApi
 from lin.bus import BusABC
 from ctypes import *
@@ -16,12 +21,15 @@ from lin import fillArray
 
 
 # todo: file needs rename to PLinBus
-class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
+class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
     __metaclass__ = BusABC
 	
-    def __init__(self, baudrate=19200, nodeAddress=0x01, STMin=0.001, FrameTimeout=1.0, **kwargs):   # ... defaulting the params here to values taken from the Python-UDS LIN config.ini file
+    def __init__(self, **kwargs):
 
+	    self.__connection = LinBusFactory.LinBusFactory(**kwargs)
+		
+		"""
         self.bus = PLinApi.PLinApi()
         if self.bus is False: raise Exception("PLIN API Not Loaded")
 
@@ -59,6 +67,7 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 		# started when the schedule is started (nothing to do otherwise).
         self.receiveThread = Thread(group=None, target=self.__receiveFunction, name="Receive Thread")
         self.receiveThreadActive = False
+		"""
 
         """ NOTE: THESE BITS WERE MARKED AS NEEDING TO BE REMOVED IN THE ORIGINAL LinBus.py -
 		THE EQUIV OF ANY SETUP NEEDS TO BE IN THE CALLING APP; in the current test case: in the Python_UDS to set up the diagnostic Schedule
@@ -94,6 +103,60 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
         """
+		
+    """
+    ##
+    # @brief a method exposing the LIN connection in case any lower level handling is required in the app(e.g. direct calls to any of the LIN API methods not relevant to UDS).
+    def linBus(self):
+        return self.__connection
+
+    ##
+    # @brief sends a message (via an active LIN Schedule) if supported by the chosen Vendor. Required for UDS operation.
+    def send(self, payload):
+        self.__connection.send(payload)
+
+    ##
+    # @brief returns a response (in response to a send call - see above) if supported by the chosen Vendor. Required for UDS operation.
+    def recv(self, timeout_s):
+        return self.__connection.recv(... can pass timeout from here if required ...)  # .... implemented in the LIN bus impl, so the rest of function replaced by this
+
+    ##
+    # @brief adds a Schedule at the specified index if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
+    def addSchedule(self, schedule, scheduleIndex):
+        self.__connection.addSchedule(schedule, scheduleIndex)
+
+    ##
+    # @brief starts the indexed Schedule if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
+    def startSchedule(self, scheduleIndex):
+        self.__connection.startSchedule(scheduleIndex)
+
+    ##
+    # @brief pauses the indexed Schedule if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
+    def pauseSchedule(self, scheduleIndex):
+        self.__connection.pauseSchedule(scheduleIndex)
+
+    ##
+    # @brief stops the indexed Schedule if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
+    def stopSchedule(self, scheduleIndex):
+        self.__connection.stopSchedule(scheduleIndex)
+
+    ##
+    # @brief Wakes up the LIN bus if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
+    def wakeupBus(self):
+        self.__connection.wakeupBus()
+
+    ##
+    # @brief Closes the connection if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
+    def closeConnection(self):
+        self.__connection.closeConnection()
+	"""
+
+    """
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	ANYTHING higher level that fits in here, can go in the above methods supported. Anything bus level/vendor specific stays below!!!!
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	THE FOLLOWING IS CURRENTLY STILL JUST A COPY OF LinBus.py
+	"""
 
     #????????????????????????????????????????? copied the higher level methods amongst the following down from LinTP.py in UDS, 
     # as we need the send and recv function here to fit the abstracted interface.
@@ -101,7 +164,6 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
     # NOTE: some of this is general to all vendors, so can be moved up to an abstracted wrapper????????????????????
 	# also some bits more TP and some more Bus, so a natural split - it's just that TP in the UDS looked too high up.
     # We probably need to see how the Vector API starts working out first.
-    # - see Python-Lin LinTp.py a couple of directories up for the WIP.
 
     ##
     # @brief sends a message over the LIN bus

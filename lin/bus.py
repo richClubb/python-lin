@@ -14,11 +14,11 @@ class BusABC(object):
         raise NotImplementedError("send function function not implemented")
 
     @abstractmethod
-    def recv(self):
+    def recv(self, timout_s):
         raise NotImplementedError("recv function function not implamented")
 
     @abstractmethod
-    def addSchedule(self, index):
+    def addSchedule(self, schedule, index):
         raise NotImplementedError("addSchedule function not implemented")
 
     @abstractmethod
@@ -34,9 +34,9 @@ class BusABC(object):
         raise NotImplementedError("stopSchedule function not implemented")
 
     @abstractmethod
-    def wakeBus(self, index):
+    def wakeBus(self):
         raise NotImplementedError("wakeBus function not implemented")
 
     @abstractmethod
-    def disconnect(self):
-        raise NotImplementedError("disconnect function not implemented")
+    def closeConnection(self):
+        raise NotImplementedError("closeConnection function not implemented")
