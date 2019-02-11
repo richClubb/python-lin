@@ -40,3 +40,5 @@ class BusABC(object):
     @abstractmethod
     def closeConnection(self):
         raise NotImplementedError("closeConnection function not implemented")
+
+		
