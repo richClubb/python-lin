@@ -3,24 +3,15 @@ from lin.bus import BusABC
 from ctypes import *
 from threading import Thread
 from lin.message import Message
-from lin.linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
-from lin.linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
-    SINGLE_FRAME_DL_INDEX, SINGLE_FRAME_DATA_START_INDEX, \
-    FIRST_FRAME_DL_INDEX_HIGH, FIRST_FRAME_DL_INDEX_LOW, FIRST_FRAME_DATA_START_INDEX, \
-    CONSECUTIVE_FRAME_SEQUENCE_NUMBER_INDEX, CONSECUTIVE_FRAME_SEQUENCE_DATA_START_INDEX
-
-# WE don't really want UDS stuff in python-lin, but these are common utilities  
-# - copying into both for now (Python-UDS and Python-Lin), until a preferred solution is decided upon
-from lin import ResettableTimer
-from lin import fillArray
+#from lin.linTypes import FrameTypes
 
 
-# todo: file needs rename to PLinBus
+# TODO: well to consider at least - does file need rename to PLinBus??
 class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 
     __metaclass__ = BusABC
 	
-    def __init__(self, baudrate=19200, nodeAddress=0x01, STMin=0.001, FrameTimeout=1.0, **kwargs):   # ... defaulting the params here to values taken from the Python-UDS LIN config.ini file
+    def __init__(self, callback=self.__callback_onReceive, baudrate=19200, **kwargs):   # ... defaulting the params here to values taken from the Python-UDS LIN config.ini file
 
         self.bus = PLinApi.PLinApi()
         if self.bus is False: raise Exception("PLIN API Not Loaded")
@@ -30,6 +21,9 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         self.hHw = PLinApi.HLINHW(0)
         self.HwMode = PLinApi.TLIN_HARDWAREMODE_MASTER
         self.HwBaudrate = c_ushort(baudrate)
+
+        # Store the reference to the callback function ...
+		self.__callback = callback
 
         # necessary to set up the connection
         result = self.bus.RegisterClient("Embed Master", None, self.hClient)
@@ -44,16 +38,6 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 
         result = self.bus.RegisterFrameId(self.hClient, self.hHw, 0x3C, 0x3D)
         if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering frame id client")
-
-		# NOTE: these bits are either moved down to here from Python-UDS LinTp.py OR need to be retained from the original LinBus.py ....
-        self.__maxPduLength = 6
-
-        self.__NAD = int(nodeAddress, 16)
-        self.__STMin = float(STMin)
-        self.__FrameTimeout = float(FrameTimeout)
-		
-        self.__recvBuffer = []
-        self.__transmitBuffer = None
 		
 		# We're now at a point where we can create the receive thread used for handling responses. The thread itself is
 		# started when the schedule is started (nothing to do otherwise).
@@ -95,136 +79,13 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
         """
 
-    #????????????????????????????????????????? copied the higher level methods amongst the following down from LinTP.py in UDS, 
-    # as we need the send and recv function here to fit the abstracted interface.
-
-    # NOTE: some of this is general to all vendors, so can be moved up to an abstracted wrapper????????????????????
-	# also some bits more TP and some more Bus, so a natural split - it's just that TP in the UDS looked too high up.
-    # We probably need to see how the Vector API starts working out first.
-    # - see Python-Lin LinTp.py a couple of directories up for the WIP.
-
-    ##
-    # @brief sends a message over the LIN bus
-    def send(self, message):
-        payload = message
-        payloadLength = len(payload)
-
-        if payloadLength > LINTP_MAX_PAYLOAD_LENGTH:
-            raise Exception("Payload too large for CAN Transport Protocol")
-
-        if payloadLength <= self.__maxPduLength:
-            state = LinTpState.SEND_SINGLE_FRAME
-        else:
-            # we might need a check for functional request as we may not be able to service functional requests for
-            # multi frame requests
-            state = LinTpState.SEND_FIRST_FRAME
-            firstFrameData = payload[0:self.__maxPduLength-1]
-            cfBlocks = self.__create_blockList(payload[5:])
-            sequenceNumber = 1
-
-        txPdu = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-
-        endOfMessage_flag = False
-
-        # Setup the required timers
-        timeoutTimer = ResettableTimer(self.__FrameTimeout)
-        stMinTimer = ResettableTimer(self.__STMin)
-
-        self.__clearBufferedMessages()
-
-        timeoutTimer.start()
-        while endOfMessage_flag is False:
-            rxPdu = self.__getNextBufferedMessage()
-            if rxPdu is not None:
-                raise Exception("Unexpected receive frame")
-
-            if state == LinTpState.SEND_SINGLE_FRAME:
-                txPdu[N_PCI_INDEX] += (LinTpMessageType.SINGLE_FRAME << 4)
-                txPdu[SINGLE_FRAME_DL_INDEX] += payloadLength
-                txPdu[SINGLE_FRAME_DATA_START_INDEX:] = fillArray(payload, self.__maxPduLength)
-                self.__transmit(txPdu)
-                endOfMessage_flag = True
-
-            elif state == LinTpState.SEND_FIRST_FRAME:
-                payloadLength_highNibble = (payloadLength & 0xF00) >> 8
-                payloadLength_lowNibble  = (payloadLength & 0x0FF)
-                txPdu[N_PCI_INDEX] += (LinTpMessageType.FIRST_FRAME << 4)
-                txPdu[FIRST_FRAME_DL_INDEX_HIGH] += payloadLength_highNibble
-                txPdu[FIRST_FRAME_DL_INDEX_LOW] += payloadLength_lowNibble
-                txPdu[FIRST_FRAME_DATA_START_INDEX:] = firstFrameData
-                self.__transmit(txPdu)
-                state = LinTpState.SEND_CONSECUTIVE_FRAME
-                stMinTimer.start()
-                timeoutTimer.restart()
-
-            elif state == LinTpState.SEND_CONSECUTIVE_FRAME:
-                if(
-                        stMinTimer.isExpired() and
-                        (self.__transmitBuffer is None)
-                ):
-                    txPdu[N_PCI_INDEX] += (LinTpMessageType.CONSECUTIVE_FRAME << 4)
-                    txPdu[CONSECUTIVE_FRAME_SEQUENCE_NUMBER_INDEX] += sequenceNumber
-                    txPdu[CONSECUTIVE_FRAME_SEQUENCE_DATA_START_INDEX:] = cfBlocks.pop(0)
-                    self.__transmit(txPdu)
-                    sequenceNumber = (sequenceNumber + 1) % 16
-                    stMinTimer.restart()
-                    timeoutTimer.restart()
-
-                    if len(cfBlocks) == 0:
-                        endOfMessage_flag = True
-
-            txPdu = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-            sleep(0.001)
-            if timeoutTimer.isExpired(): raise Exception("Timeout")
-
-
-    ##
-    # @brief creates the blocklist from the blocksize and payload
-    def __create_blockList(self, payload):
-        blockList = []
-        currBlock = []
-
-        payloadLength = len(payload)
-        counter = 0
-
-        for i in range(0, payloadLength):
-
-            currBlock.append(payload[i])
-            counter += 1
-
-            if counter == self.__maxPduLength:
-                blockList.append(currBlock)
-                counter = 0
-                currBlock = []
-
-        if len(currBlock) is not 0:
-            blockList.append(fillArray(currBlock, self.__maxPduLength))
-
-        return blockList
-
-    ##
-    # @brief clear out the receive list - used to reset the list when sending to make way for the expected response
-    def __clearBufferedMessages(self):
-        self.__recvBuffer = []
-        self.__transmitBuffer = None
-
-    ##
-    # @brief retrieves the next message from the received message buffers - used to check if the buffer is empty when sending, or populated when receiving.
-    # @return list, or None if nothing is on the receive list
-    def __getNextBufferedMessage(self):
-        length = len(self.__recvBuffer)
-        if(length != 0):
-            return self.__recvBuffer.pop(0)
-        else:
-            return None
-
 
     ##
     # @brief assembles the message prior to sending and stores a copy of own message for use when processing any responses
-    def __transmit(self, payload):
+    def transmit(self, payload):
         txPdu = [self.__NAD] + payload
         self.__sendMasterRequest(txPdu)
-        self.__transmitBuffer = txPdu
+
 
     ##
     # @brief sends the message over LIN via the low level PLinApi call
@@ -239,64 +100,6 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
             data[i] = c_ubyte(pdu[i])
 
         self.bus.UpdateByteArray(self.hClient, self.hHw, 0x3C, 0, 8, data)    # ... it would be helpful to replace a lot of the magic numbers  TODO
-
-
-    ##
-    # @brief returns any complete message (may need assembling) from the message buffer if received within the timeout.
-    # Note: the message buffer is filled via the receive thread - see __receiveFunction().
-    def recv(self, timeout_s):
-        timeoutTimer = ResettableTimer(timeout_s)
-
-        payload = []
-        payloadPtr = 0
-        payloadLength = None
-
-        sequenceNumberExpected = 1
-
-        endOfMessage_flag = False
-
-        state = LinTpState.IDLE
-
-        timeoutTimer.start()
-        while endOfMessage_flag is False:
-
-            rxPdu = self.__getNextBufferedMessage()
-
-            if rxPdu is not None:
-                N_PCI = (rxPdu[N_PCI_INDEX] & 0xF0) >> 4
-                if state == LinTpState.IDLE:
-                    if N_PCI == LinTpMessageType.SINGLE_FRAME:
-                        payloadLength = rxPdu[N_PCI_INDEX & 0x0F]
-                        payload = rxPdu[SINGLE_FRAME_DATA_START_INDEX: SINGLE_FRAME_DATA_START_INDEX + payloadLength]
-                        endOfMessage_flag = True
-                    elif N_PCI == LinTpMessageType.FIRST_FRAME:
-                        payload = rxPdu[FIRST_FRAME_DATA_START_INDEX:]
-                        payloadLength = ((rxPdu[FIRST_FRAME_DL_INDEX_HIGH] & 0x0F) << 8) + rxPdu[
-                            FIRST_FRAME_DL_INDEX_LOW]
-                        payloadPtr = self.__maxPduLength - 1
-                        state = LinTpState.RECEIVING_CONSECUTIVE_FRAME
-                        timeoutTimer.restart()
-                elif state == LinTpState.RECEIVING_CONSECUTIVE_FRAME:
-                    if N_PCI == LinTpMessageType.CONSECUTIVE_FRAME:
-                        sequenceNumber = rxPdu[CONSECUTIVE_FRAME_SEQUENCE_NUMBER_INDEX] & 0x0F
-                        if sequenceNumber != sequenceNumberExpected:
-                            raise Exception("Consecutive frame sequence out of order")
-                        else:
-                            sequenceNumberExpected = (sequenceNumberExpected + 1) % 16
-                        payload += rxPdu[CONSECUTIVE_FRAME_SEQUENCE_DATA_START_INDEX:]
-                        payloadPtr += (self.__maxPduLength)
-                        timeoutTimer.restart()
-                    else:
-                        raise Exception("Unexpected PDU received")
-
-            if payloadLength is not None:
-                if payloadPtr >= payloadLength:
-                    endOfMessage_flag = True
-
-            if timeoutTimer.isExpired():
-                raise Exception("Timeout in waiting for message")
-
-        return list(payload[:payloadLength])
 
 
     ##
@@ -316,32 +119,20 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
                     for i in range(0, length):
                         msg.payload[i] = recvMessage.Data[i]
 
-                    self.__callback_onReceive(msg)
+                    self.__callback(msg)
+
 
     ##
-    # @brief called in the receive thread from __receiveFunction() upon successful message receipt, to process the message and put the result in the buffer for the recv() method.
+    # @brief called in the receive thread from __receiveFunction() upon successful message receipt, 
+    # to process the message and put the result in the buffer for the recv() method.
+    # This is a default callback function to trap a missing reference.
     def __callback_onReceive(self, msg):
+        ##raise NotImplementedError("callback_onReceive function not implemented")
+
+        # This should be overriden (a callback function should be passed to the constructor), but this version will allow some testing, so leaving here for now ...
         msgNad = msg.payload[0]
         msgFrameId = msg.frameId
-        #print("Received message: frameId={0}".format(msgFrameId))
-
-        if msgNad == self.__NAD:
-            if msgFrameId == 0x3C:                             # ... it would be helpful to replace a lot of the magic numbers  TODO
-                if msg.payload == self.__transmitBuffer:
-                    self.__transmitBuffer = None
-
-            elif msgFrameId == 0x3D or 125:
-                self.__recvBuffer.append(msg.payload[1:8])
-
-
-    ##
-    # @brief this start the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
-    def startSchedule(self, index):
-        result = self.bus.StartSchedule(self.hClient, self.hHw, index)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
-
-        self.receiveThreadActive = True
-        self.receiveThread.start()
+        print("Received message: frameId={0}".format(msgFrameId))
 
 
     ##
@@ -355,12 +146,12 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
             scheduleSlot = schedule.frameSlots[i]
             outputScheduleSlot = PLinApi.TLINScheduleSlot()
 
+            """
             if scheduleSlot.frameType == FrameTypes.MASTER_REQUEST:
                 pass
             elif scheduleSlot.frameType == FrameTypes.SLAVE_RESPONSE:
                 pass
-
-
+            """
 
             ## set the schedule slot types
             diagSchedule[i] = outputScheduleSlot
@@ -368,6 +159,16 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         # add the schedule to the hardware
         result = self.bus.SetSchedule(self.hClient, self.hHw, index, diagSchedule, schedule.size)
         if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error adding schedule table")
+
+
+    ##
+    # @brief this start the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
+    def startSchedule(self, index):
+        result = self.bus.StartSchedule(self.hClient, self.hHw, index)
+        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
+
+        self.receiveThreadActive = True
+        self.receiveThread.start()
 
 
     ##

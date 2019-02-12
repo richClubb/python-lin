@@ -7,15 +7,15 @@ class BusABC(object):
 
     @abstractmethod
     def __init__(self):
-        raise NotImplementedError("__init__ function function not implemented")
+        raise NotImplementedError("__init__ function not implemented")
 
     @abstractmethod
     def send(self, message):
-        raise NotImplementedError("send function function not implemented")
+        raise NotImplementedError("send function not implemented")
 
     @abstractmethod
     def recv(self, timout_s):
-        raise NotImplementedError("recv function function not implamented")
+        raise NotImplementedError("recv function not implemented")
 
     @abstractmethod
     def addSchedule(self, schedule, index):

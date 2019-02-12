@@ -1,12 +1,9 @@
 
-# THIS IS CURRENTLY A COPY OF PEAK/LinBus.py - copied to here see that any general transport level methods can be kept apart from the lower level bus API impls
-# THIS IS A WIP - only just looking at this and considering at present!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# NOTE: This module is based on the PEAK/LinBus.py - copied to here to see that any general transport level methods can be kept apart from the lower level bus API impls
+# This is still a WIP, although some separation of methods for this level has been made.
 
-from lin import PLinApi
 from lin.bus import BusABC
 from ctypes import *
-from threading import Thread
 from lin.message import Message
 from lin.linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
 from lin.linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
@@ -20,38 +17,16 @@ from lin import ResettableTimer
 from lin import fillArray
 
 
-# todo: file needs rename to PLinBus
 class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
     __metaclass__ = BusABC
 	
-    def __init__(self, **kwargs):
+    def __init__(self, nodeAddress=0x01, STMin=0.001, FrameTimeout=1.0, **kwargs):
 
-	    self.__connection = LinBusFactory.LinBusFactory(**kwargs)
-		
-		"""
-        self.bus = PLinApi.PLinApi()
-        if self.bus is False: raise Exception("PLIN API Not Loaded")
-
-        # Unset handles - set in the register/connection code further down, or via values passed in ...
-        self.hClient = PLinApi.HLINCLIENT(0)
-        self.hHw = PLinApi.HLINHW(0)
-        self.HwMode = PLinApi.TLIN_HARDWAREMODE_MASTER
-        self.HwBaudrate = c_ushort(baudrate)
-
-        # necessary to set up the connection
-        result = self.bus.RegisterClient("Embed Master", None, self.hClient)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
-
-        self.hHw = PLinApi.HLINHW(1)
-        result = self.bus.ConnectClient(self.hClient, self.hHw)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error connecting client")
-
-        result = self.bus.InitializeHardware(self.hClient, self.hHw, PLinApi.TLIN_HARDWAREMODE_MASTER, self.HwBaudrate)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error initialising hardware")
-
-        result = self.bus.RegisterFrameId(self.hClient, self.hHw, 0x3C, 0x3D)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering frame id client")
+        # Mostly we'll be setting up the LIN bus with whatever bus specific arguments are required - passed down via kwarg. In addtion, we'll always need to 
+		# specify the callback method to receive the returning responses for local buffering and processing (not sure if this is the correct method/syntax - needs testing)
+	    self.__connection = LinBusFactory.LinBusFactory(callback=self.callback_onReceive, **kwargs)
+        # ... note: the kwargs will contain the correct bus type, ensuring that we have the correct one selected.
 
 		# NOTE: these bits are either moved down to here from Python-UDS LinTp.py OR need to be retained from the original LinBus.py ....
         self.__maxPduLength = 6
@@ -63,107 +38,9 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
         self.__recvBuffer = []
         self.__transmitBuffer = None
 		
-		# We're now at a point where we can create the receive thread used for handling responses. The thread itself is
-		# started when the schedule is started (nothing to do otherwise).
-        self.receiveThread = Thread(group=None, target=self.__receiveFunction, name="Receive Thread")
-        self.receiveThreadActive = False
-		"""
-
-        """ NOTE: THESE BITS WERE MARKED AS NEEDING TO BE REMOVED IN THE ORIGINAL LinBus.py -
-		THE EQUIV OF ANY SETUP NEEDS TO BE IN THE CALLING APP; in the current test case: in the Python_UDS to set up the diagnostic Schedule
-        # configure schedule
-        # todo: get this out of the class this is unnecessary - NOTE: the upper wrapper handles schedule adding starting and stoppping 
-        masterRequestScheduleSlot = PLinApi.TLINScheduleSlot()
-        masterRequestScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_MASTER_REQUEST
-        masterRequestScheduleSlot.Delay = 10
-
-        slaveResponseScheduleSlot = PLinApi.TLINScheduleSlot()
-        slaveResponseScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_SLAVE_RESPONSE
-        slaveResponseScheduleSlot.Delay = 10
-
-        diagSchedule = (PLinApi.TLINScheduleSlot * 2)()
-        diagSchedule[0] = masterRequestScheduleSlot
-        diagSchedule[1] = slaveResponseScheduleSlot
-
-        masterRequestFrameEntry = PLinApi.TLINFrameEntry()
-        masterRequestFrameEntry.FrameId = c_ubyte(0x3C)
-        masterRequestFrameEntry.Length = c_ubyte(8)
-        masterRequestFrameEntry.Direction = PLinApi.TLIN_DIRECTION_PUBLISHER
-        masterRequestFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
-        masterRequestFrameEntry.Flags = PLinApi.FRAME_FLAG_RESPONSE_ENABLE
-        for i in range(0, 8):
-            masterRequestFrameEntry.InitialData[0] = c_ubyte(0)
-
-        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
-        slaveResponseFrameEntry.FrameId = c_ubyte(0x3D)
-        slaveResponseFrameEntry.Length = c_ubyte(8)
-        slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
-        slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
-
-        result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
-        result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
-        """
 		
-    """
-    ##
-    # @brief a method exposing the LIN connection in case any lower level handling is required in the app(e.g. direct calls to any of the LIN API methods not relevant to UDS).
-    def linBus(self):
-        return self.__connection
-
-    ##
-    # @brief sends a message (via an active LIN Schedule) if supported by the chosen Vendor. Required for UDS operation.
-    def send(self, payload):
-        self.__connection.send(payload)
-
-    ##
-    # @brief returns a response (in response to a send call - see above) if supported by the chosen Vendor. Required for UDS operation.
-    def recv(self, timeout_s):
-        return self.__connection.recv(... can pass timeout from here if required ...)  # .... implemented in the LIN bus impl, so the rest of function replaced by this
-
-    ##
-    # @brief adds a Schedule at the specified index if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
-    def addSchedule(self, schedule, scheduleIndex):
-        self.__connection.addSchedule(schedule, scheduleIndex)
-
-    ##
-    # @brief starts the indexed Schedule if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
-    def startSchedule(self, scheduleIndex):
-        self.__connection.startSchedule(scheduleIndex)
-
-    ##
-    # @brief pauses the indexed Schedule if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
-    def pauseSchedule(self, scheduleIndex):
-        self.__connection.pauseSchedule(scheduleIndex)
-
-    ##
-    # @brief stops the indexed Schedule if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
-    def stopSchedule(self, scheduleIndex):
-        self.__connection.stopSchedule(scheduleIndex)
-
-    ##
-    # @brief Wakes up the LIN bus if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
-    def wakeupBus(self):
-        self.__connection.wakeupBus()
-
-    ##
-    # @brief Closes the connection if supported by the chosen Vendor. Exposed to allow customised control of the LIN bus.
-    def closeConnection(self):
-        self.__connection.closeConnection()
-	"""
-
-    """
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	ANYTHING higher level that fits in here, can go in the above methods supported. Anything bus level/vendor specific stays below!!!!
-	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	THE FOLLOWING IS CURRENTLY STILL JUST A COPY OF LinBus.py
-	"""
-
-    #????????????????????????????????????????? copied the higher level methods amongst the following down from LinTP.py in UDS, 
-    # as we need the send and recv function here to fit the abstracted interface.
-
-    # NOTE: some of this is general to all vendors, so can be moved up to an abstracted wrapper????????????????????
-	# also some bits more TP and some more Bus, so a natural split - it's just that TP in the UDS looked too high up.
-    # We probably need to see how the Vector API starts working out first.
+    # NOTE: anything general to all vendors, shoukd be here. This is a first attempt at getting the split right, but it will be adapted as more bus interfaces
+	# are added for different vendors (the current version of this module is based only on the Peak implementation - Vector API is to come).
 
     ##
     # @brief sends a message over the LIN bus
@@ -284,23 +161,8 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
     ##
     # @brief assembles the message prior to sending and stores a copy of own message for use when processing any responses
     def __transmit(self, payload):
-        txPdu = [self.__NAD] + payload
-        self.__sendMasterRequest(txPdu)
+        self.__connection.transmit(payload)  # ... dependant of which bus is used, so leave it to the lower level.
         self.__transmitBuffer = txPdu
-
-    ##
-    # @brief sends the message over LIN via the low level PLinApi call
-    def __sendMasterRequest(self, pdu):
-        dataLength = len(pdu)
-        data = (c_ubyte * 8)()
-
-        for i in range(0, 8):
-            data[i] = c_ubyte(0)
-
-        for i in range(0, dataLength):
-            data[i] = c_ubyte(pdu[i])
-
-        self.bus.UpdateByteArray(self.hClient, self.hHw, 0x3C, 0, 8, data)    # ... it would be helpful to replace a lot of the magic numbers  TODO
 
 
     ##
@@ -362,27 +224,8 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
 
     ##
-    # @brief runs in the receive thread, kicked of in __init__(), to handle receipt of any incoming messages.
-    def __receiveFunction(self):
-        recvMessage = PLinApi.TLINRcvMsg()
-
-        while(self.receiveThreadActive):
-            result = self.bus.Read(self.hClient, recvMessage)
-            if result == PLinApi.TLIN_ERROR_OK:
-                if recvMessage.ErrorFlags == PLinApi.TLIN_MSGERROR_OK:
-                    msg = Message()
-                    msg.frameId = recvMessage.FrameId
-                    if recvMessage.FrameId == 125:              # ... it would be helpful to replace a lot of the magic numbers  TODO
-                        msg.frameId = 0x3D
-                    length = recvMessage.Length
-                    for i in range(0, length):
-                        msg.payload[i] = recvMessage.Data[i]
-
-                    self.__callback_onReceive(msg)
-
-    ##
     # @brief called in the receive thread from __receiveFunction() upon successful message receipt, to process the message and put the result in the buffer for the recv() method.
-    def __callback_onReceive(self, msg):
+    def callback_onReceive(self, msg):
         msgNad = msg.payload[0]
         msgFrameId = msg.frameId
         #print("Received message: frameId={0}".format(msgFrameId))
@@ -397,67 +240,53 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
 
     ##
-    # @brief this start the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
-    def startSchedule(self, index):
-        result = self.bus.StartSchedule(self.hClient, self.hHw, index)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
-
-        self.receiveThreadActive = True
-        self.receiveThread.start()
+    # @brief this function converts the schedule from the python-lin to the bus version
+    # Note: the bus selected may or may not support this!
+    def addSchedule(self, schedule, index):
+        self.__connection.addSchedule(schedule, index)  # ... dependant of which bus is used, so leave it to the lower level.
 
 
     ##
-    # @brief this function converts the schedule from the python-lin to the bus version
-    def addSchedule(self, schedule, index):
-
-        # creates the diagnostic schedule
-        diagSchedule = (PLinApi.TLINScheduleSlot * schedule.size)()
-
-        for i in range(schedule.size):
-            scheduleSlot = schedule.frameSlots[i]
-            outputScheduleSlot = PLinApi.TLINScheduleSlot()
-
-            if scheduleSlot.frameType == FrameTypes.MASTER_REQUEST:
-                pass
-            elif scheduleSlot.frameType == FrameTypes.SLAVE_RESPONSE:
-                pass
+    # @brief this starts the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
+    # Note: the bus selected may or may not support this!
+    def startSchedule(self, index):
+        self.__connection.startSchedule(index)  # ... dependant of which bus is used, so leave it to the lower level.
 
 
+    ##
+    # @brief this pauses the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
+    # Note: the bus selected may or may not support this!
+    def pauseSchedule(self, index):
+        self.__connection.pauseSchedule(index)  # ... dependant of which bus is used, so leave it to the lower level.
 
-            ## set the schedule slot types
-            diagSchedule[i] = outputScheduleSlot
 
-        # add the schedule to the hardware
-        result = self.bus.SetSchedule(self.hClient, self.hHw, index, diagSchedule, schedule.size)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error adding schedule table")
+    ##
+    # @brief this stops the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
+    # Note: the bus selected may or may not support this!
+    def stopSchedule(self, index):
+        self.__connection.stopSchedule(index)  # ... dependant of which bus is used, so leave it to the lower level.
 
 
     ##
     # @brief this function wakes up the bus
+    # Note: the bus selected may or may not support this!
     def wakeupBus(self):
-        self.bus.XmtWakeUp(self.hClient, self.hHw)
+        self.__connection.wakeupBus()  # ... dependant of which bus is used, so leave it to the lower level.
+
 
 
     ##
     # @brief this function closes the connection to the bus
+    # Note: the bus selected may or may not support this!
     def closeConnection(self):
-
-        self.receiveThreadActive = False
-
-        while self.receiveThread.is_alive():
-            pass
-
-        self.bus.SuspendSchedule(self.hClient, self.hHw)
-
-        self.bus.ResetHardwareConfig(self.hClient, self.hHw)
-        self.bus.RemoveClient(self.hClient)
+        self.__connection.closeConnection()  # ... dependant of which bus is used, so leave it to the lower level.
 
 
 
 if __name__ == "__main__":
 
     from time import time
-    connection = LinBus(19200)
+    connection = LinTp(linBusType="Peak",baudrate=19200)
     connection.startSchedule(1)  # ... starts the diagnostic schedule (index 1)
 
     startTime = time()
@@ -467,7 +296,7 @@ if __name__ == "__main__":
     while (currTime - startTime) < 5:
 
         if (currTime - sendTime) > 1:
-            connection.sendMasterRequest([0, 1, 2, 3, 4, 5, 6, 7])
+            connection.send([0, 1, 2, 3, 4, 5, 6, 7])
             sendTime = currTime
 
         currTime = time()
