@@ -21,7 +21,7 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
     __metaclass__ = BusABC
 	
-    def __init__(self, nodeAddress=0x01, STMin=0.001, FrameTimeout=1.0, **kwargs):
+    def __init__(self, nodeAddress=0x01, STMin=0.001, FrameTimeout=1.0, ldf=None, **kwargs):
 
         # Mostly we'll be setting up the LIN bus with whatever bus specific arguments are required - passed down via kwarg. In addtion, we'll always need to 
 		# specify the callback method to receive the returning responses for local buffering and processing (not sure if this is the correct method/syntax - needs testing)
@@ -37,6 +37,48 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 		
         self.__recvBuffer = []
         self.__transmitBuffer = None
+		
+		self.__ldf = ldf  
+        # ... we need to add something at this layer to parse (and process?) the ldf - we need to be setting up whatever schedule is required (or all?) 
+        # e.g. in the python-uds use case, we need the diagnostic schedule setting up as transparently as possible !!!!!!!!!!!!!!!!!!!!!!!!!!!
+		
+		# This is the setup originally in the peak bus constructor - I'm guessing we need something similar but more generic (and driven from the ldf);
+        # any low-level calls will need support at the bus module level for each bus type supported ...
+        """ NOTE: THESE BITS WERE MARKED AS NEEDING TO BE REMOVED IN THE ORIGINAL LinBus.py -  but schedule set up is required from the ldf - move what can be moved
+		up to the abstracted LinTp.py in the top directory - 
+		THE EQUIV OF ANY SETUP NEEDS TO BE IN THE CALLING APP; in the current test case: in the Python_UDS to set up the diagnostic Schedule
+        # configure schedule
+        # todo: get this out of the class this is unnecessary - NOTE: the upper wrapper handles schedule adding starting and stoppping 
+        masterRequestScheduleSlot = PLinApi.TLINScheduleSlot()
+        masterRequestScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_MASTER_REQUEST
+        masterRequestScheduleSlot.Delay = 10
+
+        slaveResponseScheduleSlot = PLinApi.TLINScheduleSlot()
+        slaveResponseScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_SLAVE_RESPONSE
+        slaveResponseScheduleSlot.Delay = 10
+
+        diagSchedule = (PLinApi.TLINScheduleSlot * 2)()
+        diagSchedule[0] = masterRequestScheduleSlot
+        diagSchedule[1] = slaveResponseScheduleSlot
+
+        masterRequestFrameEntry = PLinApi.TLINFrameEntry()
+        masterRequestFrameEntry.FrameId = c_ubyte(0x3C)
+        masterRequestFrameEntry.Length = c_ubyte(8)
+        masterRequestFrameEntry.Direction = PLinApi.TLIN_DIRECTION_PUBLISHER
+        masterRequestFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
+        masterRequestFrameEntry.Flags = PLinApi.FRAME_FLAG_RESPONSE_ENABLE
+        for i in range(0, 8):
+            masterRequestFrameEntry.InitialData[0] = c_ubyte(0)
+
+        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
+        slaveResponseFrameEntry.FrameId = c_ubyte(0x3D)
+        slaveResponseFrameEntry.Length = c_ubyte(8)
+        slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
+        slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
+
+        result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
+        result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
+        """
 		
 		
     # NOTE: anything general to all vendors, shoukd be here. This is a first attempt at getting the split right, but it will be adapted as more bus interfaces
@@ -225,17 +267,17 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
     ##
     # @brief called in the receive thread from __receiveFunction() upon successful message receipt, to process the message and put the result in the buffer for the recv() method.
-    def callback_onReceive(self, msg):
+    def callback_onReceive(self, msg, sendFrameId=0x3C, receiveFrameId=0x3D):  # ... defaulting to sending and receiving diagnostic messages (0x3C - master request frame used for diagnostics)
         msgNad = msg.payload[0]
         msgFrameId = msg.frameId
         #print("Received message: frameId={0}".format(msgFrameId))
 
         if msgNad == self.__NAD:
-            if msgFrameId == 0x3C:                             # ... it would be helpful to replace a lot of the magic numbers  TODO
+            if msgFrameId == sendFrameId:                             # ... it would be helpful to replace a lot of the magic numbers  - 0x3C/0x3D are the special diagnostic send/recv frame ids
                 if msg.payload == self.__transmitBuffer:
                     self.__transmitBuffer = None
 
-            elif msgFrameId == 0x3D or 125:
+            elif msgFrameId == receiveFrameId or 125:                 # ... 125?
                 self.__recvBuffer.append(msg.payload[1:8])
 
 

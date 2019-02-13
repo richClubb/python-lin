@@ -1,9 +1,12 @@
+# NOTE: Currently the code is specific to diagnostic scheduled (pretty much hardcoded at present) - do we want this to continue to be the case? (can it be used in any other way?)
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 from lin import PLinApi
 from lin.bus import BusABC
 from ctypes import *
 from threading import Thread
 from lin.message import Message
-#from lin.linTypes import FrameTypes
+from lin.linTypes import FrameTypes
 
 
 # TODO: well to consider at least - does file need rename to PLinBus??
@@ -44,7 +47,8 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         self.receiveThread = Thread(group=None, target=self.__receiveFunction, name="Receive Thread")
         self.receiveThreadActive = False
 
-        """ NOTE: THESE BITS WERE MARKED AS NEEDING TO BE REMOVED IN THE ORIGINAL LinBus.py -
+        """ NOTE: THESE BITS WERE MARKED AS NEEDING TO BE REMOVED IN THE ORIGINAL LinBus.py -  but schedule set up is required from the ldf - move what can be moved
+		up to the abstracted LinTp.py in the top directory - 
 		THE EQUIV OF ANY SETUP NEEDS TO BE IN THE CALLING APP; in the current test case: in the Python_UDS to set up the diagnostic Schedule
         # configure schedule
         # todo: get this out of the class this is unnecessary - NOTE: the upper wrapper handles schedule adding starting and stoppping 
@@ -119,14 +123,14 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
                     for i in range(0, length):
                         msg.payload[i] = recvMessage.Data[i]
 
-                    self.__callback(msg)
+                    self.__callback(msg, receiveFrameId=msg.frameId) # ... !!!!!!!  where is the correlating sendFrameId? !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
     ##
     # @brief called in the receive thread from __receiveFunction() upon successful message receipt, 
     # to process the message and put the result in the buffer for the recv() method.
     # This is a default callback function to trap a missing reference.
-    def __callback_onReceive(self, msg):
+    def __callback_onReceive(self, msg, sendFrameId=0x3C, receiveFrameId=0x3D):  # ... defaulting to sending and receiving diagnostic messages
         ##raise NotImplementedError("callback_onReceive function not implemented")
 
         # This should be overriden (a callback function should be passed to the constructor), but this version will allow some testing, so leaving here for now ...
@@ -146,12 +150,10 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
             scheduleSlot = schedule.frameSlots[i]
             outputScheduleSlot = PLinApi.TLINScheduleSlot()
 
-            """
             if scheduleSlot.frameType == FrameTypes.MASTER_REQUEST:
                 pass
             elif scheduleSlot.frameType == FrameTypes.SLAVE_RESPONSE:
                 pass
-            """
 
             ## set the schedule slot types
             diagSchedule[i] = outputScheduleSlot
