@@ -1,5 +1,14 @@
-# NOTE: Currently the code is specific to diagnostic scheduled (pretty much hardcoded at present) - do we want this to continue to be the case? (can it be used in any other way?)
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#!/usr/bin/env python
+
+__author__ = "Richard Clubb"
+__copyrights__ = "Copyright 2019, the python-lin project"
+__credits__ = ["Richard Clubb"]
+
+__license__ = "MIT"
+__maintainer__ = "Richard Clubb"
+__email__ = "richard.clubb@embeduk.com"
+__status__ = "Development"
+
 
 from lin import PLinApi
 from lin.bus import BusABC
@@ -9,6 +18,9 @@ from lin.message import Message
 from lin.linTypes import FrameTypes
 
 
+##
+# @brief Currently the code is specific to diagnostic scheduled (pretty much hardcoded at present) - ultimately this needs to be more general.
+#
 # TODO: well to consider at least - does file need rename to PLinBus??
 class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 

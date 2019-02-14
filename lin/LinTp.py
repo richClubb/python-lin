@@ -1,6 +1,14 @@
+#!/usr/bin/env python
 
-# NOTE: This module is based on the PEAK/LinBus.py - copied to here to see that any general transport level methods can be kept apart from the lower level bus API impls
-# This is still a WIP, although some separation of methods for this level has been made.
+__author__ = "Richard Clubb"
+__copyrights__ = "Copyright 2019, the python-lin project"
+__credits__ = ["Richard Clubb"]
+
+__license__ = "MIT"
+__maintainer__ = "Richard Clubb"
+__email__ = "richard.clubb@embeduk.com"
+__status__ = "Development"
+
 
 from lin.bus import BusABC
 from ctypes import *
@@ -17,6 +25,16 @@ from lin import ResettableTimer
 from lin import fillArray
 
 
+##
+# @brief This class provides a LIN transport, with a clearly defined, simple to use interface. The underlying LIN bus is hidden from the app, although this can
+# be exposed upon request, if the app requires low-level handling beyond what is provided automatically.
+#
+# Note: the initial use-case for Python-LIN is diagnostics, so initially there is a leaning towards diagnostic schedule handling, however the project
+# is more general, and so must support full LIN communications beyond just the diagnostic schedule (selection of just diagnostics as an option must be
+# maintained though).
+#
+# Note: This module is based on the PEAK/LinBus.py - copied to here to see that any general transport level methods can be kept apart from the lower level bus API impls
+# This is still a WIP, although some separation of methods for this level has been made.
 class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
     __metaclass__ = BusABC

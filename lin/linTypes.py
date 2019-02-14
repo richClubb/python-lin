@@ -1,3 +1,15 @@
+#!/usr/bin/env python
+
+__author__ = "Richard Clubb"
+__copyrights__ = "Copyright 2019, the python-lin project"
+__credits__ = ["Richard Clubb"]
+
+__license__ = "MIT"
+__maintainer__ = "Richard Clubb"
+__email__ = "richard.clubb@embeduk.com"
+__status__ = "Development"
+
+
 from enum import Enum
 
 
