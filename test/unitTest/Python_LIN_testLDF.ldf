@@ -1,0 +1,179 @@
+/*************************************************************************************/
+//                                                                                     
+// Description: LIN Description file created using Vector's Network Designer(anonymised for testing)   
+// Created:     05 May 2016 20:00:51
+// Author:      network.admin
+// Version:     0.0
+//                                                                                     
+/*************************************************************************************/
+
+// P14 3.5
+
+LIN_description_file;
+LIN_protocol_version = "2.0";
+LIN_language_version = "2.0";
+LIN_speed = 19.0 kbps;
+
+Nodes {
+  Master: BodyController, 10 ms, 0 ms ; 
+  Slaves: CCU1234, DSwitch ;
+}
+
+
+Signals {
+  NDSwitchRFailure: 4, 15, DSwitch, BodyController ; // Some comment
+  NDoorCommandCounter: 8, 0, BodyController, DSwitch ; // Some comment
+  NDoorCounter: 8, 0, DSwitch, BodyController ; // Some comment
+  NDoorIntMechOpened: 2, 3, DSwitch, BodyController ;
+  NDoorOpenLINStatus1: 2, 3, DSwitch, BodyController ;
+  NDoorOpenLINStatus2: 2, 3, DSwitch, BodyController ;
+  NDoorOpenRequested: 2, 0, BodyController, DSwitch ; // Some comment
+  NInvDoorOpenRequested: 2, 0, BodyController, DSwitch ; // Some comment
+                                                         // Some comment (extended)
+                                                         // Some comment (extended)
+  Reserved00: 1, 0, BodyController, CCU1234 ; 
+  Reserved01: 3, 0, BodyController, CCU1234 ; 
+}
+
+Diagnostic_signals {
+  MasterReqB0: 8, 0 ;
+  MasterReqB1: 8, 0 ;
+  MasterReqB2: 8, 0 ;
+  MasterReqB3: 8, 0 ;
+  MasterReqB4: 8, 0 ;
+  MasterReqB5: 8, 0 ;
+  MasterReqB6: 8, 0 ;
+  MasterReqB7: 8, 0 ;
+  SlaveRespB0: 8, 0 ;
+  SlaveRespB1: 8, 0 ;
+  SlaveRespB2: 8, 0 ;
+  SlaveRespB3: 8, 0 ;
+  SlaveRespB4: 8, 0 ;
+  SlaveRespB5: 8, 0 ;
+  SlaveRespB6: 8, 0 ;
+  SlaveRespB7: 8, 0 ;
+}
+
+
+Frames {
+  DCommand_0: 5, BodyController, 2 {
+    NInvDoorOpenRequested, 4 ;
+    NDoorOpenRequested, 6 ;
+    NDoorCommandCounter, 8 ;
+  } 
+  DStatus_0: 0, DSwitch, 3 {
+    NDoorIntMechOpened, 2 ;
+    NDoorOpenLINStatus2, 4 ;
+    NDoorOpenLINStatus1, 6 ;
+    NDSwitchRFailure, 12 ;
+    NDoorCounter, 16 ;
+  }  
+}
+
+
+
+Diagnostic_frames {
+  MasterReq: 0x3c {
+    MasterReqB0, 0 ;
+    MasterReqB1, 8 ;
+    MasterReqB2, 16 ;
+    MasterReqB3, 24 ;
+    MasterReqB4, 32 ;
+    MasterReqB5, 40 ;
+    MasterReqB6, 48 ;
+    MasterReqB7, 56 ;
+  }
+  SlaveResp: 0x3d {
+    SlaveRespB0, 0 ;
+    SlaveRespB1, 8 ;
+    SlaveRespB2, 16 ;
+    SlaveRespB3, 24 ;
+    SlaveRespB4, 32 ;
+    SlaveRespB5, 40 ;
+    SlaveRespB6, 48 ;
+    SlaveRespB7, 56 ;
+  }
+}
+
+Node_attributes {
+  CCU1234{
+    LIN_protocol = "2.0" ;
+    configured_NAD = 0x7 ;
+    initial_NAD = 0x7 ;
+    product_id = 0x0, 0x0, 0 ;
+    response_error = CCU_Err ;
+    N_As_timeout = 1000 ms ;
+    N_Cr_timeout = 1000 ms ;
+    configurable_frames {
+      Configurable_1 ;
+      Configurable_2 ;
+    }
+  } 
+  DSwitch{
+    LIN_protocol = "2.0" ;
+    configured_NAD = 0x4 ;
+    initial_NAD = 0x4 ;
+    product_id = 0x0, 0x0, 0 ;
+    response_error = DSwitch_Err ;
+    N_As_timeout = 1000 ms ;
+    N_Cr_timeout = 1000 ms ;
+    configurable_frames {
+      DStatus ;
+      DCommand ;
+    }
+  }
+}
+
+Schedule_tables {
+ SecurityLINNormal {
+    DStatus_0 delay 10 ms ;    DCommand_0 delay 10 ms ;  }
+ SecurityLIN_Diag {
+    MasterReq delay 10 ms ;
+    SlaveResp delay 10 ms ;
+  }
+ SecurityLIN_Slave_Wakeup {
+    DStatus_0 delay 10 ms ;
+  }
+}
+
+
+Signal_encoding_types {
+  Enc1_NDSwitchRFailure {
+    logical_value, 0, "no fault" ;
+    logical_value, 1, "actuator failure" ;
+    logical_value, 2, "claw sensor 1 failure" ;
+    logical_value, 3, "claw sensor 2 failure" ;
+    logical_value, 4, "both claw sensor switches failed" ;
+    logical_value, 15, "default" ;
+  }
+  Enc1_NDoorIntMechOpened {
+    logical_value, 0, "not mechanical" ;
+    logical_value, 1, "mechanical" ;
+    logical_value, 3, "default" ;
+  } 
+  Enc1_NDoorOpenRequested {
+    logical_value, 0, "close" ;
+    logical_value, 1, "open" ;
+    logical_value, 3, "Default" ;
+  }
+  Enc1_NInvDoorOpenRequested {
+    logical_value, 0, "default" ;
+    logical_value, 2, "open" ;
+    logical_value, 3, "close" ;
+  } 
+  RawDoorStatusLIN {
+    logical_value, 0, "closed" ;
+    logical_value, 1, "open" ;
+    logical_value, 2, "not used" ;
+    logical_value, 3, "default" ;
+  Enc_physicalEndocingCheck {    physical_value, 0, 65535, 0.010, 0.000, "km/h" ;  }  
+}
+
+Signal_representation {
+  Enc1_NDSwitchRFailure: NDSwitchRFailure ;
+  Enc1_NDoorIntMechOpened: NDoorIntMechOpened ;
+  Enc1_NDoorOpenRequested: NDoorOpenRequested ;
+  Enc1_NInvDoorOpenRequested: NInvDoorOpenRequested ;
+  RawDoorStatusLIN: NDoorOpenLINStatus1, NDoorOpenLINStatus2 ;
+}
+
