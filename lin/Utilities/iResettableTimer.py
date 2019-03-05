@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 __author__ = "Richard Clubb"
-__copyrights__ = "Copyright 2018, the python-uds project"
+__copyrights__ = "Copyright 2019, the python-lin project"
 __credits__ = ["Richard Clubb"]
 
 __license__ = "MIT"
