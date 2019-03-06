@@ -26,6 +26,7 @@ class LdfParsingState(IntEnum):
     SignalRepresentation = 10
     EOF = 11
 
+
 class LdfFile(object):
 
     ##
@@ -92,7 +93,7 @@ class LdfFile(object):
                 if line[:2] == '/*':
                     comment = True
                     continue
-                if comment and line[-2:] == '*/':
+                if comment and line[-2:] == '*/':  # 
                     comment = False
                     continue
             except:
@@ -593,6 +594,16 @@ class LdfFile(object):
     # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
     def getLdfDictionary(self):
         return self.ldfDictionary
+		createNode("nodename")
+		by slave name require
+		- list of signals
+		- set of frames assicated with it
+		- tx is slave to master
+		- rx master to slave
+		
+		- event frames and collisions need to be looked at
+		
+		- list of slave object or a master object
 
 if __name__ == "__main__":
 
