@@ -1,13 +1,13 @@
 /*************************************************************************************/
 //                                                                                     
-// Description: LIN Description file created using Vector's Network Designer(anonymised for testing)   
-// Created:     05 May 2016 20:00:51
-// Author:      network.admin
-// Version:     0.0
+// Description: LIN Description file created using Vector tools(anonymised for testing)   
+// Created:     06/02/2019
+// Author:      <Python-LIN tester>
+// Version:     1.0
 //                                                                                     
 /*************************************************************************************/
 
-// P14 3.5
+// R 1.2.3
 
 LIN_description_file;
 LIN_protocol_version = "2.0";
@@ -16,25 +16,25 @@ LIN_speed = 19.0 kbps;
 
 Nodes {
   Master: BodyController, 10 ms, 0 ms ; 
-  Slaves: CCU1234, DSwitch ;
+  Slaves: LINTestCU, DSwitch ;
 }
-
+// Inter-block comment
 
 Signals {
-  NDSwitchRFailure: 4, 15, DSwitch, BodyController ; // Some comment
-  NDoorCommandCounter: 8, 0, BodyController, DSwitch ; // Some comment
-  NDoorCounter: 8, 0, DSwitch, BodyController ; // Some comment
-  NDoorIntMechOpened: 2, 3, DSwitch, BodyController ;
-  NDoorOpenLINStatus1: 2, 3, DSwitch, BodyController ;
-  NDoorOpenLINStatus2: 2, 3, DSwitch, BodyController ;
-  NDoorOpenRequested: 2, 0, BodyController, DSwitch ; // Some comment
-  NInvDoorOpenRequested: 2, 0, BodyController, DSwitch ; // Some comment
-                                                         // Some comment (extended)
-                                                         // Some comment (extended)
-  Reserved00: 1, 0, BodyController, CCU1234 ; 
-  Reserved01: 3, 0, BodyController, CCU1234 ; 
+  NDSwitchFailure: 4, 15, DSwitch, BodyController ; // comment - one space separation
+  NDCommandCounter: 8, 0, BodyController, DSwitch ;       // comment - multi space separation
+  NDCounter: 8, 0, DSwitch, BodyController ;// comment - no space separation
+  NDActivated: 2, 3, DSwitch, BodyController ;
+  NDOpenLINStatus1: 2, 3, DSwitch, BodyController ;
+  NDOpenLINStatus2: 2, 3, DSwitch, BodyController ;
+  NDOpenRequested: 2, 0, BodyController, DSwitch ;	// comment - one tab separation
+  NIDOpenRequested: 2, 0, BodyController, DSwitch ; // comment - mulit line block
+                                                    // comment (extended)
+                                                    // comment (extended)
+  Reserved00: 1, 0, BodyController, LINTestCU ; 
+  Reserved01: 3, 0, BodyController, LINTestCU ; 
 }
-
+/* Inter-block comment */
 Diagnostic_signals {
   MasterReqB0: 8, 0 ;
   MasterReqB1: 8, 0 ;
@@ -53,25 +53,22 @@ Diagnostic_signals {
   SlaveRespB6: 8, 0 ;
   SlaveRespB7: 8, 0 ;
 }
-
-
+// Inter-block comment - no blank lines
 Frames {
   DCommand_0: 5, BodyController, 2 {
-    NInvDoorOpenRequested, 4 ;
-    NDoorOpenRequested, 6 ;
-    NDoorCommandCounter, 8 ;
+    NIDOpenRequested, 4 ;
+    NDOpenRequested, 6 ;
+    NDCommandCounter, 8 ;
   } 
   DStatus_0: 0, DSwitch, 3 {
-    NDoorIntMechOpened, 2 ;
-    NDoorOpenLINStatus2, 4 ;
-    NDoorOpenLINStatus1, 6 ;
-    NDSwitchRFailure, 12 ;
-    NDoorCounter, 16 ;
+    NDActivated, 2 ;
+    NDOpenLINStatus2, 4 ;
+    NDOpenLINStatus1, 6 ;
+    NDSwitchFailure, 12 ;
+    NDCounter, 16 ;
   }  
 }
-
-
-
+/* Inter-block comment - no blank lines */
 Diagnostic_frames {
   MasterReq: 0x3c {
     MasterReqB0, 0 ;
@@ -94,9 +91,8 @@ Diagnostic_frames {
     SlaveRespB7, 56 ;
   }
 }
-
-Node_attributes {
-  CCU1234{
+/* Inter-block comment - no blank lines */Node_attributes {
+  LINTestCU{
     LIN_protocol = "2.0" ;
     configured_NAD = 0x7 ;
     initial_NAD = 0x7 ;
@@ -122,8 +118,8 @@ Node_attributes {
       DCommand ;
     }
   }
-}
-
+}
+/* Inter-block comment - multi lines */
 Schedule_tables {
  SecurityLINNormal {
     DStatus_0 delay 10 ms ;    DCommand_0 delay 10 ms ;  }
@@ -135,45 +131,44 @@ Schedule_tables {
     DStatus_0 delay 10 ms ;
   }
 }
-
+/* Comment block that could be confusing if not ignored ...Schedule_example { Some_Schedule {    ... ;    ... ;  }}*/
 
 Signal_encoding_types {
-  Enc1_NDSwitchRFailure {
+  Enc1_NDSwitchFailure {
     logical_value, 0, "no fault" ;
-    logical_value, 1, "actuator failure" ;
-    logical_value, 2, "claw sensor 1 failure" ;
-    logical_value, 3, "claw sensor 2 failure" ;
-    logical_value, 4, "both claw sensor switches failed" ;
+    logical_value, 1, "failure 1" ;
+    logical_value, 2, "failure 2" ;
+    logical_value, 3, "failure 3" ;
+    logical_value, 4, "fialure 4" ;
     logical_value, 15, "default" ;
   }
-  Enc1_NDoorIntMechOpened {
-    logical_value, 0, "not mechanical" ;
-    logical_value, 1, "mechanical" ;
+  Enc1_NDActivated {
+    logical_value, 0, "state 0" ;
+    logical_value, 1, "state 1" ;
     logical_value, 3, "default" ;
   } 
-  Enc1_NDoorOpenRequested {
+  Enc1_NDOpenRequested {
     logical_value, 0, "close" ;
     logical_value, 1, "open" ;
     logical_value, 3, "Default" ;
   }
-  Enc1_NInvDoorOpenRequested {
+  Enc1_NIDOpenRequested {
     logical_value, 0, "default" ;
     logical_value, 2, "open" ;
     logical_value, 3, "close" ;
   } 
-  RawDoorStatusLIN {
+  RDStatusLIN {
     logical_value, 0, "closed" ;
     logical_value, 1, "open" ;
     logical_value, 2, "not used" ;
-    logical_value, 3, "default" ;
-  Enc_physicalEndocingCheck {    physical_value, 0, 65535, 0.010, 0.000, "km/h" ;  }  
-}
+    logical_value, 3, "default" ;  }   Enc_physicalEncodingCheck_01 {    physical_value, 0, 65535, 0.010, 0.000, "km/h" ;  }  
+  Enc_physicalEncodingCheck_02 {    physical_value, 0, -3000, 0.200, 0.000, "rpm" ;  }    Enc_bcdEncodingCheck {    bcd_value ;  }    Enc_asciiEncodingCheck {    ascii_value ;  }  }
 
 Signal_representation {
-  Enc1_NDSwitchRFailure: NDSwitchRFailure ;
-  Enc1_NDoorIntMechOpened: NDoorIntMechOpened ;
-  Enc1_NDoorOpenRequested: NDoorOpenRequested ;
-  Enc1_NInvDoorOpenRequested: NInvDoorOpenRequested ;
-  RawDoorStatusLIN: NDoorOpenLINStatus1, NDoorOpenLINStatus2 ;
+  Enc1_NDSwitchFailure: NDSwitchFailure ;
+  Enc1_NDActivated: NDActivated ;
+  Enc1_NDOpenRequested: NDOpenRequested ;
+  Enc1_NIDOpenRequested: NIDOpenRequested ;
+  RDStatusLIN: NDOpenLINStatus1, NDOpenLINStatus2 ;
 }
 
