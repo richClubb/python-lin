@@ -20,11 +20,13 @@ class LdfParsingState(IntEnum):
     DiagnosticSignals = 4
     Frames = 5
     DiagnosticFrames = 6
-    NodeAttributes = 7
-    ScheduleTables = 8
-    SignalEncodingTypes = 9
-    SignalRepresentation = 10
-    EOF = 11
+    SporadicFrames = 7
+    EventTriggeredFrames = 8
+    NodeAttributes = 9
+    ScheduleTables = 10
+    SignalEncodingTypes = 11
+    SignalRepresentation = 12
+    EOF = 13
 
 
 class LdfFile(object):
@@ -58,6 +60,10 @@ class LdfFile(object):
                 self.ldfDictionary['Frames'], parsingState = self.__parseLdfFrames()
             elif parsingState == LdfParsingState.DiagnosticFrames:
                 self.ldfDictionary['DiagnosticFrames'], parsingState = self.__parseLdfDiagnosticFrames()
+            elif parsingState == LdfParsingState.SporadicFrames:
+                self.ldfDictionary['SporadicFrames'], parsingState = self.__parseLdfSporadicFrames()
+            elif parsingState == LdfParsingState.EventTriggeredFrames:
+                self.ldfDictionary['EventTriggeredFrames'], parsingState = self.__parseLdfEventTriggeredFrames()
             elif parsingState == LdfParsingState.NodeAttributes:
                 self.ldfDictionary['NodeAttributes'], parsingState = self.__parseLdfNodeAttributes()
             elif parsingState == LdfParsingState.ScheduleTables:
@@ -140,6 +146,10 @@ class LdfFile(object):
                 state = LdfParsingState.Frames
             elif line_lower == "diagnostic_frames {":
                 state = LdfParsingState.DiagnosticFrames
+            elif line_lower == "sporadic_frames {":
+                state = LdfParsingState.SporadicFrames
+            elif line_lower == "event_triggered_frames {":
+                state = LdfParsingState.EventTriggeredFrames
             elif line_lower == "node_attributes {":
                 state = LdfParsingState.NodeAttributes
             elif line_lower == "schedule_tables {":
@@ -384,6 +394,65 @@ class LdfFile(object):
 
 
     ##
+    # @brief parses out the sporadic frames entries from the ldf file
+    def __parseLdfSporadicFrames(self):
+        # As all blank lines and comment lines are stripped out, keep reading and processing
+        # until we reach a block that is not part of the frames section.
+        sporadic_frames = {}  # ... dictionary entries added in form '<sporadic frame name>': [<frame_name list>]}
+        while True:
+            line = self.__getLine()
+            if line is None:
+                state = LdfParsingState.EOF
+                break
+            elif "}" in line:
+                line = self.__getLine()
+                if line is None:
+                    state = LdfParsingState.EOF
+                    break
+                state = self.__checkNewState(line)
+                break
+            else:
+                sporadic_frame_name,_,frame_list = line.partition(": ")
+                frame_list = frame_list[:-1].split(",") # ... remove trailing ";"
+				sporadic_frames[sporadic_frame_name] = [frame.strip() for frame in frame_list]
+				
+        return (sporadic_frames,state)
+
+
+    ##
+    # @brief parses out the event triggered frames entries from the ldf file
+    def __parseLdfEventTriggeredFrames(self):
+        # As all blank lines and comment lines are stripped out, keep reading and processing
+        # until we reach a block that is not part of the frames section.
+        et_frames = {}  # ... dictionary entries added in form '<frame name>': {'<event triggered frame name': 'collision_resolving_schedule_table': <table id>, 'frame_id': <frame_id>, 'frame_name': None}
+        while True:
+            line = self.__getLine()
+            if line is None:
+                state = LdfParsingState.EOF
+                break
+            elif "}" in line:
+                line = self.__getLine()
+                if line is None:
+                    state = LdfParsingState.EOF
+                    break
+                state = self.__checkNewState(line)
+                break
+            else:
+                et_frame_name,_,frame_details = line.partition(": ")
+                parts = frame_details[:-1].split(",") # ... remove trailing ";"
+                et_frame = {'collision_resolving_schedule_table': None, 'frame_id': None, 'frame_name': None}
+				
+                et_frame['collision_resolving_schedule_table']   = parts[0].strip()
+                et_frame['frame_id']   = parts[1].strip()
+				if len(parts) == 3:
+                    et_frame['frame_name']   = int(parts[2].strip())
+
+                et_frames[et_frame_name] = et_frame
+
+        return (et_frames,state)
+
+
+    ##
     # @brief parses out the nodes attributes entries from the ldf file
     def __parseLdfNodeAttributes(self):
         # As all blank lines and comment lines are stripped out, keep reading and processing
@@ -493,10 +562,70 @@ class LdfFile(object):
                     schedule_tables[table_name] = []
                     block_depth = 2  # ... inner-block for signals within frame
                 else: # ... block depth == 2 so dealing with an inner-block ...
-                    command_name,_,frame_time = line[:-1].partition("delay") # ... remove trailing ";"
-                    command = {'command': None, 'frame_time': None}
-                    command['command']   = command_name.strip()
-                    command['frame_time']   = int(frame_time.strip()[:-2].strip())
+                    command,_,frame_time = line[:-1].partition("delay") # ... remove trailing ";"
+                    command = {'command_type': None, 'SID': None, 'frame_name': None, 'NAD': None, 'node_name': None, 'dump': None, 'free': None, 'frame_index': None,'frame_time': None}
+                    command['frame_time'] = int(frame_time.strip()[:-2].strip())
+					
+                    # I've no examples as to how some of these are presented (ascii, hex, etc.), or for that matter how they're used, so changes will almost certainly be required (TODO)
+                    command_lower = command.lower()
+                    if 'masterreq' in command_lower:
+                        command['command_type'] = 'MasterReq'
+                    elif 'slaveresp' in command_lower:
+                        command['command_type'] = 'SlaveResp'
+                    elif 'assignnad' in command_lower:
+                        command['command_type'] = 'AssignNAD'
+                        command['SID']= 0xB0                      
+						_,_,node_name = command.strip()[:-1].partition("{")
+                        command['node_name']= node_name.strip()                       
+                    elif 'conditionalchangenad' in command_lower:
+                        command['SID']= 0xB3                      
+                        command['command_type'] = 'ConditionalChangeNAD'
+						_,_,nad_details = command.strip()[:-1].partition("{")
+						parts = nad_details.split(",")
+						nad = {'NAD': None, 'id': None, 'byte': None, 'mask': None, 'inv': None, 'new_NAD': None}
+                        nad['NAD'] = self.__int_or_hex(parts[0])  # ... these should all be hex values                 
+                        nad['id'] = self.__int_or_hex(parts[1])               
+                        nad['byte'] = self.__int_or_hex(parts[2])                      
+                        nad['mask'] = self.__int_or_hex(parts[3])               
+                        nad['inv'] = self.__int_or_hex(parts[4])       
+                        nad['new_NAD'] = self.__int_or_hex(parts[5])               
+                        command['NAD'] = nad                       
+                    elif 'datadump' in command_lower:
+                        command['SID']= 0xB4                      
+                        command['command_type'] = 'DataDump'
+						_,_,dump_details = command.strip()[:-1].partition("{")
+						parts = dump_details.split(",")             
+                        command['node_name']= parts[0].strip()                       
+                        command['dump'] = [self.__int_or_hex(d) for d in parts[1:]] # ... these should all be hex values - D1 to D5
+                    elif 'saveconfiguration ' in command_lower:
+                        command['SID']= 0xB6                    
+                        command['command_type'] = 'SaveConfiguration'
+						_,_,node_name = command.strip()[:-1].partition("{")
+                        command['node_name']= node_name.strip()                       
+                    elif 'assignframeidrange ' in command_lower:
+                        command['SID']= 0xB7                      
+                        command['command_type'] = 'AssignFrameIdRange'
+						_,_,frame_details = command.strip()[:-1].partition("{")
+						parts = frame_details.split(",")             
+                        command['node_name'] = parts[0].strip()
+                        command['frame_index'] = self.__int_or_hex(parts[1])
+                        if len(parts) > 2:
+                            command['frame_PIDs'] = [self.__int_or_hex(fp) for fp in parts[2:]] # ... assuming these are all hex values (NEEDS CHECKING)
+                    elif 'freeformat ' in command_lower:
+                        command['command_type'] = 'FreeFormat'
+						_,_,data_details = command.strip()[:-1].partition("{")
+						parts = data_details.split(",")                                   
+                        command['free'] = [self.__int_or_hex(d) for d in parts] # ... these should all be hex values - D1 to D8
+                    elif 'assignframeid ' in command_lower:
+                        command['SID']= 0xB1                      
+                        command['command_type'] = 'AssignFrameId'
+						_,_,frame_details = command.strip()[:-1].partition("{")
+						parts = frame_details.split(",")             
+                        command['node_name']= parts[0].strip()
+                        command['frame_name']= parts[1].strip()
+                    else:
+                        command['command_type'] = 'frame_name'                        
+                        command['frame_name'] = command.strip()                        
 
                     schedule_tables[table_name].append(command)
 			
@@ -594,6 +723,9 @@ class LdfFile(object):
     # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
     def getLdfDictionary(self):
         return self.ldfDictionary
+		
+		
+    """
 		createNode("nodename")
 		by slave name require
 		- list of signals
@@ -604,6 +736,45 @@ class LdfFile(object):
 		- event frames and collisions need to be looked at
 		
 		- list of slave object or a master object
+    """
+    # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
+    def getFrameSlots(self, frame_name=frame_name):
+        frameId                = None
+		delay                  = None
+		checksumType           = None
+		frameType              = None
+		collisionScheduleIndex = None
+		initialData            = None
+		length                 = None
+        try:
+            frameId = self.ldfDictionary['Frames']['__id_to_name'][frame_name]
+            frame_data = self.ldfDictionary['Frames'][frame_name]
+        except:
+            pass
+        return (frameId,delay,checksumType,frameType,collisionScheduleIndex,initialData,length)
+
+"""
+               if block_depth == 1:
+                    frame_name,_,frame_details = line.partition(": ")
+                    parts = frame_details[:-1].split(",") # ... remove trailing "{"
+				
+                    frame = {'frame_id': None, 'publisher': None, 'frame_size': None, 'signals': []}
+                    frame['frame_id']   = int(parts[0].strip())
+                    frame['publisher'] = parts[1].strip()
+                    frame['frame_size'] = int(parts[2].strip())
+
+                    frames[frame_name] = frame
+                    id_to_name[frame['frame_id']] = frame_name
+                    block_depth = 2  # ... inner-block for signals within frame
+                else: # ... block depth == 2 so dealing with an inner-block ...
+                    parts = line[:-1].split(",") # ... remove trailing ";"
+                    signal = {'signal_name': None, 'signal_offset': None}
+                    signal['signal_name']   = parts[0].strip()
+                    signal['signal_offset']   = int(parts[1].strip())
+
+                    frames[frame_name]['signals'].append(signal)
+
+"""
 
 if __name__ == "__main__":
 
