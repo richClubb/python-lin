@@ -9,7 +9,7 @@ __maintainer__ = "Richard Clubb"
 __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
-
+from lin.frameSlot import FrameSlot
 
 class ScheduleTable(object):
 
@@ -23,7 +23,8 @@ class ScheduleTable(object):
         if ldf is none and filename is not None:
             self.__ldf = LdfFile(filename)
 
-        self.__frameSlots = self.__ldf.getFrameSlots(schedule_name=schedule_name)  # ... could be None, in which case it will return an empty table
+		# Schedule_name could be None, in which case it will return an empty list ...
+        self.__frameSlots = [FrameSlot(frame_name=fn) for fn in self.__ldf.getFrameNames(schedule_name=schedule_name)]
 		self.__size = len(self.__frameSlots)
 
     @property

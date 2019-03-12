@@ -29,7 +29,7 @@ class FrameSlot(object):
         if ldf is none and filename is not None:
             self.__ldf = LdfFile(filename)		
 
-        frameSlotData = self.__ldf.getFrameSlots(frame_name=frame_name)  # ... could be None, in which case it will return an empty table       
+        frameSlotData = self.__ldf.getFrameDetails(frame_name=frame_name)  # ... could be None, in which case it will return an empty table       
         self.__frameId                = frameSlotData[0]
 		self.__delay                  = frameSlotData[1]   # from sched table delay
 		self.__checksumType           = frameSlotData[2]

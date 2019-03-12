@@ -130,7 +130,7 @@ Schedule_tables {
  SecurityLIN_Slave_Wakeup {
     DStatus_0 delay 10 ms ;
   }
-}
+ ParserTestOnly {    MasterReq delay 10 ms ;    SlaveResp delay 10 ms ;    AssignNAD {LINTestCU} delay 10 ms ;    ConditionalChangeNAD {0x06, 0x01, 0x02, 0xFF, 0x0F, 0x07} delay 10 ms ;    DataDump {LINTestCU, 0x01, 0x02, 0x03, 0x04, 0x05} delay 10 ms ;    SaveConfiguration {LINTestCU} delay 10 ms ;    AssignFrameIdRange {LINTestCU, 0x01} delay 10 ms ;    AssignFrameIdRange {LINTestCU, 0x01, 0x11, 0x12, 0x13, 0x14} delay 10 ms ;    FreeFormat {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08} delay 10 ms ;    AssignFrameId {LINTestCU, DCommand_0} delay 10 ms ;  }}
 /* Comment block that could be confusing if not ignored ...Schedule_example { Some_Schedule {    ... ;    ... ;  }}*/
 
 Signal_encoding_types {
