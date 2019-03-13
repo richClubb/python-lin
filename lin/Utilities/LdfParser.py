@@ -47,31 +47,35 @@ class LdfFile(object):
 
         self.__sendChunksize = None
 
-        while parsingState != LdfParsingState.EOF:
-            if parsingState == LdfParsingState.Header:
-                self.ldfDictionary['Header'], parsingState  = self.__parseLdfHeader()
-            elif parsingState == LdfParsingState.Nodes:
-                self.ldfDictionary['Nodes'], parsingState = self.__parseLdfNodes()
-            elif parsingState == LdfParsingState.Signals:
-                self.ldfDictionary['Signals'], parsingState = self.__parseLdfSignals()
-            elif parsingState == LdfParsingState.DiagnosticSignals:
-                self.ldfDictionary['DiagnosticSignals'], parsingState = self.__parseLdfDiagnosticSignals()
-            elif parsingState == LdfParsingState.Frames:
-                self.ldfDictionary['Frames'], parsingState = self.__parseLdfFrames()
-            elif parsingState == LdfParsingState.DiagnosticFrames:
-                self.ldfDictionary['DiagnosticFrames'], parsingState = self.__parseLdfDiagnosticFrames()
-            elif parsingState == LdfParsingState.SporadicFrames:
-                self.ldfDictionary['SporadicFrames'], parsingState = self.__parseLdfSporadicFrames()
-            elif parsingState == LdfParsingState.EventTriggeredFrames:
-                self.ldfDictionary['EventTriggeredFrames'], parsingState = self.__parseLdfEventTriggeredFrames()
-            elif parsingState == LdfParsingState.NodeAttributes:
-                self.ldfDictionary['NodeAttributes'], parsingState = self.__parseLdfNodeAttributes()
-            elif parsingState == LdfParsingState.ScheduleTables:
-                self.ldfDictionary['ScheduleTables'], parsingState = self.__parseLdfScheduleTables()
-            elif parsingState == LdfParsingState.SignalEncodingTypes:
-                self.ldfDictionary['SignalEncodingTypes'], parsingState = self.__parseLdfSignalEncodingTypes()
-            elif parsingState == LdfParsingState.SignalRepresentation:
-                self.ldfDictionary['SignalRepresentation'], parsingState = self.__parseLdfSignalRepresentation()
+        try:
+            while parsingState != LdfParsingState.EOF:
+                if parsingState == LdfParsingState.Header:
+                    self.ldfDictionary['Header'], parsingState  = self.__parseLdfHeader()
+                elif parsingState == LdfParsingState.Nodes:
+                    self.ldfDictionary['Nodes'], parsingState = self.__parseLdfNodes()
+                elif parsingState == LdfParsingState.Signals:
+                    self.ldfDictionary['Signals'], parsingState = self.__parseLdfSignals()
+                elif parsingState == LdfParsingState.DiagnosticSignals:
+                    self.ldfDictionary['DiagnosticSignals'], parsingState = self.__parseLdfDiagnosticSignals()
+                elif parsingState == LdfParsingState.Frames:
+                    self.ldfDictionary['Frames'], parsingState = self.__parseLdfFrames()
+                elif parsingState == LdfParsingState.DiagnosticFrames:
+                    self.ldfDictionary['DiagnosticFrames'], parsingState = self.__parseLdfDiagnosticFrames()
+                elif parsingState == LdfParsingState.SporadicFrames:
+                    self.ldfDictionary['SporadicFrames'], parsingState = self.__parseLdfSporadicFrames()
+                elif parsingState == LdfParsingState.EventTriggeredFrames:
+                    self.ldfDictionary['EventTriggeredFrames'], parsingState = self.__parseLdfEventTriggeredFrames()
+                elif parsingState == LdfParsingState.NodeAttributes:
+                    self.ldfDictionary['NodeAttributes'], parsingState = self.__parseLdfNodeAttributes()
+                elif parsingState == LdfParsingState.ScheduleTables:
+                    self.ldfDictionary['ScheduleTables'], parsingState = self.__parseLdfScheduleTables()
+                elif parsingState == LdfParsingState.SignalEncodingTypes:
+                    self.ldfDictionary['SignalEncodingTypes'], parsingState = self.__parseLdfSignalEncodingTypes()
+                elif parsingState == LdfParsingState.SignalRepresentation:
+                    self.ldfDictionary['SignalRepresentation'], parsingState = self.__parseLdfSignalRepresentation()
+        except:
+            self.__reportError("Untrapped exception detected in the LDF file")
+            raise
 
         # ... by this stage, the LDF file has been parsed and converted to an internal dictionary form. 
         # We can then expose the details as required via getter methods (e.g. compositing any elements required).
@@ -251,15 +255,24 @@ class LdfFile(object):
                 state = self.__checkNewState(line)
                 break
             else:
-                signal_name,_,signal_details = line.partition(": ")
+                signal_name,_,signal_details = line.partition(": ") 
                 parts = signal_details[:-1].split(",") # ... remove trailing ";"
 				
-                signal = {'signal_size': None, 'initial_value': None, 'publisher': None, 'subscriber': None}
-                signal['signal_size']   = int(parts[0].strip())   # ... bit (0..7), byte (8), integer (16), array (16..64)
-                signal['initial_value'] = int(parts[1].strip())   # ... note: this is an int or int array - currently not handling an int array (TODO) !!!!!!!!!!!!!!!!!!!!!!!!!!!
-                signal['publisher']     = parts[2].strip()
-                signal['subscriber']    = parts[3].strip()
-				
+                signal = {'signal_size': None, 'initial_value': [], 'publisher': None, 'subscribers': []}
+                signal['signal_size'] = int(parts[0].strip())   # ... bit (0..7), byte (8), integer (16), array (16..64)
+                i = 0
+                if "{" in parts[1]:
+                    while True:
+                        i += 1
+                        if "}" in parts[i]:
+                            signal['initial_value'].append(int(parts[1].replace("{","").replace("}","").strip()))
+                            break
+                        signal['initial_value'].append(int(parts[1].replace("{","").replace("}","").strip()))							
+                else:
+                    signal['initial_value'] = [int(parts[1].strip())]
+                    i = 2
+                signal['publisher'] = parts[i].strip()
+                signal['subscribers'] = [parts[s].strip() for s in range(i+1,len(parts))]	
                 signals[signal_name] = signal
 
         return (signals,state)
@@ -458,7 +471,6 @@ class LdfFile(object):
         # As all blank lines and comment lines are stripped out, keep reading and processing
         # until we reach a block that is not part of the frames section.
         node_attributes = {}  # ... dictionary entries added in form '<frame name>': {'signal_size': None, 'initial_value': None, ???: []}
-        id_to_name = {} # ... inverse lookup in case it's required
         block_depth = 1  # ... used to track if dealing with an inner-block or the outer-block entry.
         node_name = None
         node_attribute_details = None
@@ -539,16 +551,17 @@ class LdfFile(object):
     def __parseLdfScheduleTables(self):
         # As all blank lines and comment lines are stripped out, keep reading and processing
         # until we reach a block that is not part of the frames section.
-        schedule_tables = {}  # ... dictionary entries added in form '<frame name>': {'signal_size': None, 'initial_value': None, ???: []}
+        schedule_tables = {'__diagnostic_table': None, '__diagnostic_index': None}  # ... dictionary entries added in form '<frame name>': {'signal_size': None, 'initial_value': None, ???: []}
+
         block_depth = 1  # ... used to track if dealing with an inner-block or the outer-block entry.
         table_name = None
+        schedule_index = 0
         while True:
             line = self.__getLine()
             if line is None:
                 state = LdfParsingState.EOF
                 break
             elif "}" == line:
-                print("end of block detected")
                 if block_depth == 1:
                     line = self.__getLine()
                     if line is None:
@@ -559,35 +572,31 @@ class LdfFile(object):
                 block_depth = 1
             else:
                 if block_depth == 1:
-                    print("block depth = 1")
-                    table_name = line[:-1].strip() # ... remove trailing "{"0
-                    schedule_tables[table_name] = []
+                    schedule_index += 1  # ... an arbitrary index for the schedules based on order of appearance in the LDF file (from 1 to 255 max - not enforced)
+                    table_name = line[:-1].strip() # ... remove trailing "{"
+                    schedule_tables[table_name] = {'index': schedule_index, 'frames': []}
                     block_depth = 2  # ... inner-block for signals within frame
                 else: # ... block depth == 2 so dealing with an inner-block ...
-                    print("block depth = 2")
-                    command_entry,_,frame_time = line[:-1].partition("delay") # ... remove trailing ";"
-                    command = {'command_type': None, 'SID': None, 'frame_name': None, 'NAD': None, 'node_name': None, 'dump': None, 'free': None, 'frame_index': None,'frame_time': None}
-                    command['frame_time'] = int(frame_time.strip()[:-2].strip())
+                    command_entry,_,delay = line[:-1].partition("delay") # ... remove trailing ";"
+                    command = {'type': None, 'SID': None, 'name': None, 'NAD': None, 'node': None, 'dump': None, 'free': None, 'frame_index': None,'delay': None}
+                    command['delay'] = int(delay.strip()[:-2].strip())
 					
                     # I've no examples as to how some of these are presented (ascii, hex, etc.), or for that matter how they're used, so changes will almost certainly be required (TODO)
                     command_lower = command_entry.lower()
-                    print(("command lower = ",command_lower))
                     if 'masterreq' in command_lower:
-                        print("masterreq matched")
-                        command['command_type'] = 'MasterReq'
+                        command['type'] = 'MasterReq'
+                        schedule_tables['__diagnostic_table'] = table_name
+                        schedule_tables['__diagnostic_index'] = schedule_index
                     elif 'slaveresp' in command_lower:
-                        print("slaveresp matched")
-                        command['command_type'] = 'SlaveResp'
+                        command['type'] = 'SlaveResp'
                     elif 'assignnad' in command_lower:
-                        print("assignnad matched")
-                        command['command_type'] = 'AssignNAD'
+                        command['type'] = 'AssignNAD'
                         command['SID']= 0xB0                      
                         _,_,node_name = command_entry.strip()[:-1].partition("{")
-                        command['node_name']= node_name.strip()                       
+                        command['node']= node_name.strip()                       
                     elif 'conditionalchangenad' in command_lower:
-                        print("conditionalchangenad matched")
                         command['SID']= 0xB3                      
-                        command['command_type'] = 'ConditionalChangeNAD'
+                        command['type'] = 'ConditionalChangeNAD'
                         _,_,nad_details = command_entry.strip()[:-1].partition("{")
                         parts = nad_details.split(",")
                         nad = {'NAD': None, 'id': None, 'byte': None, 'mask': None, 'inv': None, 'new_NAD': None}
@@ -599,50 +608,44 @@ class LdfFile(object):
                         nad['new_NAD'] = self.__int_or_hex(parts[5])               
                         command['NAD'] = nad                       
                     elif 'datadump' in command_lower:
-                        print("datadump matched")
                         command['SID']= 0xB4                      
-                        command['command_type'] = 'DataDump'
+                        command['type'] = 'DataDump'
                         _,_,dump_details = command_entry.strip()[:-1].partition("{")
                         parts = dump_details.split(",")             
-                        command['node_name']= parts[0].strip()                       
+                        command['node']= parts[0].strip()                       
                         command['dump'] = [self.__int_or_hex(d) for d in parts[1:]] # ... these should all be hex values - D1 to D5
                     elif 'saveconfiguration ' in command_lower:
-                        print("saveconfiguration matched")
                         command['SID']= 0xB6                    
-                        command['command_type'] = 'SaveConfiguration'
+                        command['type'] = 'SaveConfiguration'
                         _,_,node_name = command_entry.strip()[:-1].partition("{")
-                        command['node_name']= node_name.strip()                       
+                        command['node']= node_name.strip()                       
                     elif 'assignframeidrange ' in command_lower:
-                        print("assignframeidrange matched")
                         command['SID']= 0xB7                      
-                        command['command_type'] = 'AssignFrameIdRange'
+                        command['type'] = 'AssignFrameIdRange'
                         _,_,frame_details = command_entry.strip()[:-1].partition("{")
                         parts = frame_details.split(",")             
-                        command['node_name'] = parts[0].strip()
+                        command['node'] = parts[0].strip()
                         command['frame_index'] = self.__int_or_hex(parts[1])
                         if len(parts) > 2:
                             command['frame_PIDs'] = [self.__int_or_hex(fp) for fp in parts[2:]] # ... assuming these are all hex values (NEEDS CHECKING)
                     elif 'freeformat ' in command_lower:
-                        print("freeformat matched")
-                        command['command_type'] = 'FreeFormat'
+                        command['type'] = 'FreeFormat'
                         _,_,data_details = command_entry.strip()[:-1].partition("{")
                         parts = data_details.split(",")                                   
                         command['free'] = [self.__int_or_hex(d) for d in parts] # ... these should all be hex values - D1 to D8
                     elif 'assignframeid ' in command_lower:
-                        print("assignframeid matched")
                         command['SID']= 0xB1                      
-                        command['command_type'] = 'AssignFrameId'
+                        command['type'] = 'AssignFrameId'
                         _,_,frame_details = command_entry.strip()[:-1].partition("{")
                         parts = frame_details.split(",")             
-                        command['node_name']= parts[0].strip()
-                        command['frame_name']= parts[1].strip()
+                        command['node']= parts[0].strip()
+                        command['name']= parts[1].strip()
                     else:
-                        print("else matched (normal frame)")
-                        command['command_type'] = 'frame_name'                        
-                        command['frame_name'] = command_entry.strip()                        
+                        command['type'] = 'frame_name'                        
+                        command['name'] = command_entry.strip()                        
 
-                    schedule_tables[table_name].append(command)
-			
+                    schedule_tables[table_name]['frames'].append(command)
+
         return (schedule_tables,state)
 
 		
@@ -653,7 +656,6 @@ class LdfFile(object):
         # As all blank lines and comment lines are stripped out, keep reading and processing
         # until we reach a block that is not part of the frames section.
         encoding_types = {}  # ... dictionary entries added in form '<frame name>': {'signal_size': None, 'initial_value': None, ???: []}
-        id_to_name = {} # ... inverse lookup in case it's required
         block_depth = 1  # ... used to track if dealing with an inner-block or the outer-block entry.
         encoding_name = None
         while True:
@@ -799,14 +801,36 @@ class LdfFile(object):
 
 if __name__ == "__main__":
 
-    ldfFile = LdfFile("../../test/unitTest/Python_LIN_testLDF.ldf")
+    ldfFile = LdfFile("../../../../McLaren_P14_SecurityLIN_3.5.ldf")
+    #ldfFile = LdfFile("../../test/unitTest/Python_LIN_testLDF.ldf")
 
     print("\n\n")
     print("ScheduleTables:")
     schedules = ldfFile.getLdfDictionary()['ScheduleTables']
+    print("Diagnostic Table:\t{0}\nDiagnostic Table Index:\t{1}\n".format(schedules['__diagnostic_table'],schedules['__diagnostic_index']))
+    del schedules['__diagnostic_table']
+    del schedules['__diagnostic_index']
     for e in schedules:
-        print("[{0}]: \n\t{1}\n".format(e,"\n\t".join([str(le) for le in schedules[e]])))
+        print("[{0}]: \nindex: {1}\nframes:\n  {2}\n".format(e,schedules[e]['index'],"\n\n  ".join(["{}".format(str(le)) for le in schedules[e]['frames']])).replace(", 'SID': None","").replace(", 'name': None","").replace(", 'NAD': None","").replace(", 'node': None","").replace(", 'dump': None","").replace(", 'free': None","").replace(", 'frame_index': None",""))
     print("\n")
+
+	
+    """
+    print("\n\n")
+    print("Frames:")
+    frames = ldfFile.getLdfDictionary()['Frames']
+    for e in frames:
+        print("[{0}]: \n\t{1}\n".format(e,"\n\t".join(["{0}: {1}".format(le,str(frames[e][le])) for le in frames[e]])))
+    print("\n")
+
+    print("\n\n")
+    print("DiagnosticFrames:")
+    frames = ldfFile.getLdfDictionary()['DiagnosticFrames']
+    for e in frames:
+        print("[{0}]: \n\t{1}\n".format(e,"\n\t".join(["{0}: {1}".format(le,str(frames[e][le])) for le in frames[e]])))
+    print("\n")
+    """
+
     """
     print("\n\n")
     print("Ldf Header:")
