@@ -556,6 +556,8 @@ class LdfFile(object):
         block_depth = 1  # ... used to track if dealing with an inner-block or the outer-block entry.
         table_name = None
         schedule_index = 0
+        frame_delays = {}
+        current_delay = None
         while True:
             line = self.__getLine()
             if line is None:
@@ -579,7 +581,8 @@ class LdfFile(object):
                 else: # ... block depth == 2 so dealing with an inner-block ...
                     command_entry,_,delay = line[:-1].partition("delay") # ... remove trailing ";"
                     command = {'type': None, 'SID': None, 'name': None, 'NAD': None, 'node': None, 'dump': None, 'free': None, 'frame_index': None,'delay': None}
-                    command['delay'] = int(delay.strip()[:-2].strip())
+                    current_delay = int(delay.strip()[:-2].strip())
+                    command['delay'] = current_delay
 					
                     # I've no examples as to how some of these are presented (ascii, hex, etc.), or for that matter how they're used, so changes will almost certainly be required (TODO)
                     command_lower = command_entry.lower()
@@ -642,10 +645,16 @@ class LdfFile(object):
                         command['name']= parts[1].strip()
                     else:
                         command['type'] = 'frame_name'                        
-                        command['name'] = command_entry.strip()                        
+                        command['name'] = command_entry.strip()
+                    if command['name'] is not None:
+                        if command['name'] not in frame_delays:
+                            frame_delays[command['name']] = {'unique': set(), 'all': set()}
+                        frame_delays[command['name']]['unique'].add(current_delay)                     
+                        frame_delays[command['name']]['all'].add((schedule_index,current_delay))                     
 
                     schedule_tables[table_name]['frames'].append(command)
-
+        
+        schedule_tables['__frame_delays'] = frame_delays
         return (schedule_tables,state)
 
 		
@@ -756,13 +765,7 @@ class LdfFile(object):
 
 
     # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
-    def getFrameNames(self, schedule_name=None):
-        frame_list = []
-        return frame_list
-
-    # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
-    def getFrameDetails(self, frame_name=None):
-        frameId                = None
+    def getScheduleDetails(self, schedule_name=None, schedule_index=None):
         delay                  = None  # ... looks like this comes from schedule?
         checksumType           = None
         frameType              = None
@@ -772,6 +775,32 @@ class LdfFile(object):
         try:
             frameId = self.ldfDictionary['Frames']['__id_to_name'][frame_name]
             frame_data = self.ldfDictionary['Frames'][frame_name]
+        except:
+            pass
+        return (frameId,delay,checksumType,frameType,collisionScheduleIndex,initialData,length)
+
+    # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
+    def getFrameNames(self, schedule_name=None):
+        frame_list = []
+        return frame_list
+
+    # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
+    def getFrameDetails(self, frame_name=None):
+        frameId                = None
+        delay                  = None  
+        checksumType           = None # TODO
+        frameType              = None
+        collisionScheduleIndex = None # TODO
+        initialData            = None # TODO
+        length                 = None # TODO
+        try:
+            frameId = self.ldfDictionary['Frames']['__id_to_name'][frame_name]
+            frame_data = self.ldfDictionary['Frames'][frame_name]
+            frame_type = frame_data['type']
+        except:
+            pass
+        try:
+            delay = sorted(list(self.ldfDictionary['ScheduleTables']['__frame_delays'][frame_name]))
         except:
             pass
         return (frameId,delay,checksumType,frameType,collisionScheduleIndex,initialData,length)
@@ -808,8 +837,11 @@ if __name__ == "__main__":
     print("ScheduleTables:")
     schedules = ldfFile.getLdfDictionary()['ScheduleTables']
     print("Diagnostic Table:\t{0}\nDiagnostic Table Index:\t{1}\n".format(schedules['__diagnostic_table'],schedules['__diagnostic_index']))
+    print("Frame Delays:\n{0}\n".format("\n".join(["  {0}: {1}".format(fd,str(schedules['__frame_delays'][fd]['unique'])) for fd in schedules['__frame_delays']])))
+    print("Frame Delays:\n{0}\n".format("\n".join(["  {0}: {1}".format(fd,str(schedules['__frame_delays'][fd]['all'])) for fd in schedules['__frame_delays']])))
     del schedules['__diagnostic_table']
     del schedules['__diagnostic_index']
+    del schedules['__frame_delays']
     for e in schedules:
         print("[{0}]: \nindex: {1}\nframes:\n  {2}\n".format(e,schedules[e]['index'],"\n\n  ".join(["{}".format(str(le)) for le in schedules[e]['frames']])).replace(", 'SID': None","").replace(", 'name': None","").replace(", 'NAD': None","").replace(", 'node': None","").replace(", 'dump': None","").replace(", 'free': None","").replace(", 'frame_index': None",""))
     print("\n")

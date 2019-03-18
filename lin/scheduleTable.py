@@ -13,24 +13,26 @@ from lin.frameSlot import FrameSlot
 
 class ScheduleTable(object):
 
-    def __init__(self, ldf=None, filename=None, schedule_name=None, transport=None):
-        self.__ldf = ldf
+    table_index_register = {} # ... used to track allocations for error handling, etc.
+
+    def __init__(self, ldf_parsed=None, ldf_filename=None, schedule_name=None, transport=None, index=None, diagnostic_schedule=False):
+        self.__ldf = ldf_parsed
         self.__frameSlots = []
         self.__sizes = 0
         self.__transport = transport
-        #self.__<??schedule index??>)   # ... what in consitutes the index? The ldf doesn't clearly specify anything as an index?
-        # ... anything to do with service index? Only other ref to index I can find is to frame index?
-        # ... the peak interface this was based on support 255 slots with straight 
-		#     indexing - index number is just where loaded, so whatever we choose? (see page 147 in PLIN API doc)
+		self.__schedule_index = None  # ... schedule index is taken from the LDF file (based on order of schedule table in the files), OR allocated/specified when the table is 
 
         # Allowing for different ways of hooking the code together at this stage (can be rationalised later).
 		# The caller can either pass a pre-parsed ldf object, or specify an ldf file to parse and use the details from.
-        if ldf is none and filename is not None:
-            self.__ldf = LdfFile(filename)
+        if self.__ldf is None and ldf_filename is not None:
+            self.__ldf = LdfFile(ldf_filename)
 
-		# Schedule_name could be None, in which case it will return an empty list ...
-        self.__frameSlots = [FrameSlot(frame_name=fn) for fn in self.__ldf.getFrameNames(schedule_name=schedule_name)]
-		self.__size = len(self.__frameSlots)
+        if self.__ldf is not None:
+            if schedule_name is not None:
+                scheduleData = self.__ldf.getScheduleDetails(schedule_name=schedule_name)  # ... could be None
+
+                self.__frameSlots = [FrameSlot(frame_name=fn) for fn in self.__ldf.getFrameNames(schedule_name=schedule_name)]
+		        self.__size = len(self.__frameSlots)
 
     @property
     def frameSlots(self):
@@ -49,13 +51,13 @@ class ScheduleTable(object):
         self.__transport = transport
 
     def start(self):
-        self.transport.startSchedule(self.__<??schedule index??>)   # ... what in consitutes the index? The ldf doesn't clearly specify anything as an index?
+        self.transport.startSchedule(self.__schedule_index)
 
     def pause(self):
-        self.transport.pauseSchedule(self.__<??schedule index??>)
+        self.transport.pauseSchedule(self.__schedule_index)
 
-    def start(self):
-        self.transport.stopSchedule(self.__<??schedule index??>)
+    def stop(self):
+        self.transport.stopSchedule(self.__schedule_index)
     """
 
 
