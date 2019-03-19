@@ -52,6 +52,10 @@ class ScheduleTable(object):
             self.__scheduleIndex = index
 
     @property
+    def scheduleName(self):
+        return self.__scheduleName
+
+    @property
     def scheduleIndex(self):
         return self.__scheduleIndex
 
@@ -93,8 +97,17 @@ if __name__ == "__main__":
         #table = ScheduleTable(schedule_name='SecurityLINNormal',ldf_filename="../../../SecurityLIN_P22_3.5.5.ldf")
         #table = ScheduleTable(index=1,ldf_filename="../../../SecurityLIN_P22_3.5.5.ldf")
         #table = ScheduleTable(index=1,ldf_filename="../../../SecurityLIN_P22_3.5.5.ldf",diagnostic_schedule=False)
-        table = ScheduleTable(ldf_filename="../../../SecurityLIN_P22_3.5.5.ldf",diagnostic_schedule=True)
+        #table = ScheduleTable(ldf_filename="../../../SecurityLIN_P22_3.5.5.ldf",diagnostic_schedule=True)
 
+        #table = ScheduleTable(ldf_filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        #table = ScheduleTable(schedule_name='SecurityLINNormal',ldf_filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        #table = ScheduleTable(schedule_name='SecurityLINNormal',ldf_filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        #table = ScheduleTable(index=1,ldf_filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        #table = ScheduleTable(index=1,ldf_filename="../../../McLaren_P14_SecurityLIN_3.5.ldf",diagnostic_schedule=False)
+        table = ScheduleTable(ldf_filename="../../../McLaren_P14_SecurityLIN_3.5.ldf",diagnostic_schedule=True)
+		
+        print(("scheduleName:",table.scheduleName))
+        print("")
         print(("scheduleIndex:",table.scheduleIndex))
         print("")
         print(("frameSchedule:",table.frameSchedule))

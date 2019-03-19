@@ -1,6 +1,6 @@
 
-from lin.linTypes import FrameType, ChecksumType
-from lin.utilities import calculatePid
+from linTypes import FrameTypes, ChecksumTypes
+from utilities import calculatePid
 
 
 class Message(object):
@@ -33,7 +33,7 @@ class Message(object):
             raise Exception("Data length not equal to specified length")
 
         if self.__frameType is None:
-            self.__type = FrameType.UNCONDITIONAL
+            self.__type = FrameTypes.UNCONDITIONAL
 
 
     @property

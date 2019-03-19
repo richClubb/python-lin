@@ -9,9 +9,9 @@ __maintainer__ = "Richard Clubb"
 __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
-from lin import LinBus
-#from lin import LinBusVector
-from lin import LinBusTest
+from interfaces.peak.LinBus import LinBus as LinBus_Peak
+#from interfaces.vector.LinBus import LinBus as LinBus_Vector
+#from lin import LinBusTest as LinBus_TEST
 
 ##
 # @brief class for creating Tp objects
@@ -25,14 +25,15 @@ class LinBusFactory(object):
     ##
     # @brief method to create the different connection types
     @staticmethod
-    def __call__(linBusType=None, baudrate=None, **kwargs):
+    def __call__(linBusType=None, baudrate=None, callback=None, **kwargs):
         if(linBusType == "Peak"):
-            return LinBus(baudrate=baudrate, **kwargs) # ... TODO: rename to LinBusPeak
+            return LinBus_Peak(baudrate=baudrate, callback=callback, **kwargs) # ... TODO: rename to LinBusPeak
         elif(linBusType == "Vector"):
-            raise NotImplementedError("DoIP transport not currently supported")
+            raise NotImplementedError("Vector transport/API not currently supported")
             #return LinBusVector(configPath=configPath, **kwargs)
         elif(linBusType == "TEST"):
-            return LinBusTest(**kwargs)
+            raise NotImplementedError("Test transport/API not currently supported")
+            #return LinBus_test(**kwargs)
         else:
             raise Exception("Unknown transport type selected")
 

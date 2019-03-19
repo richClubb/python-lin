@@ -10,19 +10,20 @@ __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
 
-from lin.bus import BusABC
+from LinBusFactory import LinBusFactory
+from bus import BusABC
 from ctypes import *
-from lin.message import Message
-from lin.linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
-from lin.linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
+from message import Message
+from linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
+from linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
     SINGLE_FRAME_DL_INDEX, SINGLE_FRAME_DATA_START_INDEX, \
     FIRST_FRAME_DL_INDEX_HIGH, FIRST_FRAME_DL_INDEX_LOW, FIRST_FRAME_DATA_START_INDEX, \
     CONSECUTIVE_FRAME_SEQUENCE_NUMBER_INDEX, CONSECUTIVE_FRAME_SEQUENCE_DATA_START_INDEX
 
 # WE don't really want UDS stuff in python-lin, but these are common utilities  
 # - copying into both for now (Python-UDS and Python-Lin), until a preferred solution is decided upon
-from lin import ResettableTimer
-from lin import fillArray
+from Utilities.ResettableTimer import ResettableTimer
+from Utilities.UtilityFunctions import fillArray
 
 
 ##
@@ -42,11 +43,12 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
     def __init__(self, nodeAddress=0x01, STMin=0.001, FrameTimeout=1.0, ldf=None, **kwargs):
 
         # Mostly we'll be setting up the LIN bus with whatever bus specific arguments are required - passed down via kwarg. In addtion, we'll always need to 
-		# specify the callback method to receive the returning responses for local buffering and processing (not sure if this is the correct method/syntax - needs testing)
-	    self.__connection = LinBusFactory.LinBusFactory(callback=self.callback_onReceive, **kwargs)
+        # specify the callback method to receive the returning responses for local buffering and processing (not sure if this is the correct method/syntax - needs testing)
+        linBusFactory = LinBusFactory()
+        self.__connection = linBusFactory(callback=self.callback_onReceive, **kwargs)
         # ... note: the kwargs will contain the correct bus type, ensuring that we have the correct one selected.
 
-		# NOTE: these bits are either moved down to here from Python-UDS LinTp.py OR need to be retained from the original LinBus.py ....
+        # NOTE: these bits are either moved down to here from Python-UDS LinTp.py OR need to be retained from the original LinBus.py ....
         self.__maxPduLength = 6
 
         self.__NAD = int(nodeAddress, 16)
@@ -56,11 +58,11 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
         self.__recvBuffer = []
         self.__transmitBuffer = None
 		
-		self.__ldf = ldf  
+        self.__ldf = ldf  
         # ... we need to add something at this layer to parse (and process?) the ldf - we need to be setting up whatever schedule is required (or all?) 
         # e.g. in the python-uds use case, we need the diagnostic schedule setting up as transparently as possible !!!!!!!!!!!!!!!!!!!!!!!!!!!
 		
-		# This is the setup originally in the peak bus constructor - I'm guessing we need something similar but more generic (and driven from the ldf);
+        # This is the setup originally in the peak bus constructor - I'm guessing we need something similar but more generic (and driven from the ldf);
         # any low-level calls will need support at the bus module level for each bus type supported ...
         """ NOTE: THESE BITS WERE MARKED AS NEEDING TO BE REMOVED IN THE ORIGINAL LinBus.py -  but schedule set up is required from the ldf - move what can be moved
 		up to the abstracted LinTp.py in the top directory - 
@@ -347,6 +349,7 @@ if __name__ == "__main__":
 
     from time import time
     connection = LinTp(linBusType="Peak",baudrate=19200)
+    """
     connection.startSchedule(1)  # ... starts the diagnostic schedule (index 1)
 
     startTime = time()
@@ -360,6 +363,6 @@ if __name__ == "__main__":
             sendTime = currTime
 
         currTime = time()
-
+    """
     connection.closeConnection()
 

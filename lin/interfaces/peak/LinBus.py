@@ -10,12 +10,12 @@ __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
 
-from lin import PLinApi
-from lin.bus import BusABC
+import interfaces.peak.PLinApi
+from bus import BusABC
 from ctypes import *
 from threading import Thread
-from lin.message import Message
-from lin.linTypes import FrameTypes
+from message import Message
+from linTypes import FrameTypes
 
 
 ##
@@ -26,8 +26,7 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 
     __metaclass__ = BusABC
 	
-    def __init__(self, callback=self.__callback_onReceive, baudrate=19200, **kwargs):   # ... defaulting the params here to values taken from the Python-UDS LIN config.ini file
-
+    def __init__(self, callback=None, baudrate=19200, **kwargs):   # ... defaulting the params here to values taken from the Python-UDS LIN config.ini file
         self.bus = PLinApi.PLinApi()
         if self.bus is False: raise Exception("PLIN API Not Loaded")
 
@@ -38,7 +37,9 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         self.HwBaudrate = c_ushort(baudrate)
 
         # Store the reference to the callback function ...
-		self.__callback = callback
+        if callback is None:
+            callback = self.__callback_onReceive
+        self.__callback = callback
 
         # necessary to set up the connection
         result = self.bus.RegisterClient("Embed Master", None, self.hClient)

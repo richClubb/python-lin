@@ -76,9 +76,14 @@ class FrameSlot(object):
 
 if __name__ == "__main__":
         #frameSlot = FrameSlot()
+
         #frameSlot = FrameSlot(filename="../../../SecurityLIN_P22_3.5.5.ldf")
-        frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../../SecurityLIN_P22_3.5.5.ldf")
+        #frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../../SecurityLIN_P22_3.5.5.ldf")
         #frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../../SecurityLIN_P22_3.5.5.ldf",delay=20)
+
+        #frameSlot = FrameSlot(filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        #frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../../McLaren_P14_SecurityLIN_3.5.ldf",delay=20)
 
         print(("frameName:",frameSlot.frameName))
         print(("frameId:",frameSlot.frameId))
