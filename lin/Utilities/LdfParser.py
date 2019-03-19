@@ -39,6 +39,7 @@ class LdfFile(object):
         self.ldfFile = open(filename, 'r')
         parsingState = LdfParsingState.Header
         self.linecount = 0  # ... using this to track file line number for error reporting purposes
+        self.base_checksum = None
 
         nextAddress = None
 
@@ -438,6 +439,7 @@ class LdfFile(object):
         # As all blank lines and comment lines are stripped out, keep reading and processing
         # until we reach a block that is not part of the frames section.
         et_frames = {}  # ... dictionary entries added in form '<frame name>': {'<event triggered frame name': 'collision_resolving_schedule_table': <table id>, 'frame_id': <frame_id>, 'frame_name': None}
+        id_to_event_table = {}
         while True:
             line = self.__getLine()
             if line is None:
@@ -456,11 +458,17 @@ class LdfFile(object):
                 et_frame = {'collision_resolving_schedule_table': None, 'frame_id': None, 'frame_name': None}
 				
                 et_frame['collision_resolving_schedule_table']   = parts[0].strip()
-                et_frame['frame_id']   = parts[1].strip()
+                et_frame['frame_id']   = int(parts[1].strip())
                 if len(parts) == 3:
-                    et_frame['frame_name']   = int(parts[2].strip())
+                    et_frame['frame_name']   = parts[2].strip()
 
                 et_frames[et_frame_name] = et_frame
+                if et_frame['frame_id'] not in id_to_event_table:
+                    id_to_event_table[et_frame['frame_id']] = {}
+                id_to_event_table[et_frame['frame_id']]['table'] = et_frame['collision_resolving_schedule_table'] # ... can frame appear in more than one? If so this needs list handling!!!!
+                id_to_event_table[et_frame['frame_id']]['frame'] = et_frame_name # ... can frame appear in more than one? If so this needs list handling!!!!
+
+        et_frames['__id_to_event_table'] = id_to_event_table
 
         return (et_frames,state)
 
@@ -474,6 +482,8 @@ class LdfFile(object):
         block_depth = 1  # ... used to track if dealing with an inner-block or the outer-block entry.
         node_name = None
         node_attribute_details = None
+        checksum_trivial = True
+        base_checksum = None
 		
         while True:
             line = self.__getLine()
@@ -493,7 +503,7 @@ class LdfFile(object):
                     node_attribute_details = None
             else:
                 if block_depth == 1:
-                    node_attribute_details = {'LIN_protocol': None, 'configured_NAD': None, 'initial_NAD': None, 'product_id': None, 'response_error': None, 'N_As_timeout': None, 'N_Cr_timeout': None, 'configurable_frames': []}
+                    node_attribute_details = {'LIN_protocol': None, 'base_checksum': None, 'configured_NAD': None, 'initial_NAD': None, 'product_id': None, 'response_error': None, 'N_As_timeout': None, 'N_Cr_timeout': None, 'configurable_frames': []}
                     node_name = line[:-1].strip() # ... remove trailing "{"
                     node_attributes[node_name] = node_attribute_details
                     block_depth = 2  # ... after current line changing to processing inner-block for node details
@@ -525,6 +535,14 @@ class LdfFile(object):
                         block_depth = 3  # ... after current line changing to processing inner-block for configurable frames within node
                     elif 'lin_protocol' in line_lower: 
                         node_attributes[node_name]['LIN_protocol'] = __extract_value(line)
+                        if self.__int_or_real(node_attributes[node_name]['LIN_protocol']) <= 2.1:
+                            node_attributes[node_name]['base_checksum'] = 'classic' # ... classic considers frame response data bytes only
+                        else:
+                            node_attributes[node_name]['base_checksum'] = 'enhanced'  # ... can be overridden to classic for diagnostic frames
+                        if base_checksum is None:
+                            base_checksum = node_attributes[node_name]['base_checksum']
+                        elif base_checksum != node_attributes[node_name]['base_checksum']:
+                            checksum_trivial = False
                     elif 'configured_nad' in line_lower:
                         node_attributes[node_name]['configured_NAD'] = __extract_value(line)
                     elif 'initial_nad' in line_lower:
@@ -542,6 +560,8 @@ class LdfFile(object):
                     configurable_frame = line[:-1].strip() # ... remove trailing ";"
                     node_attributes[node_name]['configurable_frames'].append(configurable_frame)
 
+        if base_checksum is not None and checksum_trivial:
+            self.base_checksum = base_checksum
         return (node_attributes,state)
 
 
@@ -558,6 +578,7 @@ class LdfFile(object):
         schedule_index = 0
         frame_delays = {}
         current_delay = None
+        id_to_table = {}
         while True:
             line = self.__getLine()
             if line is None:
@@ -577,6 +598,7 @@ class LdfFile(object):
                     schedule_index += 1  # ... an arbitrary index for the schedules based on order of appearance in the LDF file (from 1 to 255 max - not enforced)
                     table_name = line[:-1].strip() # ... remove trailing "{"
                     schedule_tables[table_name] = {'index': schedule_index, 'frames': []}
+                    id_to_table[schedule_index] = table_name
                     block_depth = 2  # ... inner-block for signals within frame
                 else: # ... block depth == 2 so dealing with an inner-block ...
                     command_entry,_,delay = line[:-1].partition("delay") # ... remove trailing ";"
@@ -588,10 +610,14 @@ class LdfFile(object):
                     command_lower = command_entry.lower()
                     if 'masterreq' in command_lower:
                         command['type'] = 'MasterReq'
+                        command['name'] = command_entry.strip()
                         schedule_tables['__diagnostic_table'] = table_name
                         schedule_tables['__diagnostic_index'] = schedule_index
                     elif 'slaveresp' in command_lower:
                         command['type'] = 'SlaveResp'
+                        command['name'] = command_entry.strip()
+                        schedule_tables['__diagnostic_table'] = table_name
+                        schedule_tables['__diagnostic_index'] = schedule_index
                     elif 'assignnad' in command_lower:
                         command['type'] = 'AssignNAD'
                         command['SID']= 0xB0                      
@@ -655,6 +681,7 @@ class LdfFile(object):
                     schedule_tables[table_name]['frames'].append(command)
         
         schedule_tables['__frame_delays'] = frame_delays
+        schedule_tables['__id_to_table'] = id_to_table
         return (schedule_tables,state)
 
 		
@@ -765,56 +792,114 @@ class LdfFile(object):
 
 
     # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
-    def getScheduleDetails(self, schedule_name=None, schedule_index=None):
-        delay                  = None  # ... looks like this comes from schedule?
-        checksumType           = None
-        frameType              = None
-        collisionScheduleIndex = None
-        initialData            = None
-        length                 = None
+    def getScheduleDetails(self, schedule_name=None, schedule_index=None, diagnostic_schedule=False):
+        name = schedule_name
+        index = schedule_index
+        frames = []
+        if schedule_index is not None:
+            try:
+                name = self.ldfDictionary['ScheduleTables']['__id_to_table'][schedule_index]
+            except:
+                pass
+        if name is None and index is None and diagnostic_schedule:
+            try:
+                name = self.ldfDictionary['ScheduleTables']['__diagnostic_table']
+                index = self.ldfDictionary['ScheduleTables']['__diagnostic_index']
+            except:
+                pass            
         try:
-            frameId = self.ldfDictionary['Frames']['__id_to_name'][frame_name]
-            frame_data = self.ldfDictionary['Frames'][frame_name]
+            index = self.ldfDictionary['ScheduleTables'][name]['index']
         except:
-            pass
-        return (frameId,delay,checksumType,frameType,collisionScheduleIndex,initialData,length)
+            raise#pass
+        try:
+            for entry in self.ldfDictionary['ScheduleTables'][name]['frames']:
+                if entry['type'] in ['frame_name','MasterReq','SlaveResp']: # ... this list should include all schedule table entry type that have a name of the sort we need here - I need to talk to Richard for this, but 'frame_name' types will get us going
+                    frames.append(entry['name'])
+        except:
+            raise#pass
+        return (name, index, frames)
 
     # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
     def getFrameNames(self, schedule_name=None):
-        frame_list = []
-        return frame_list
+        frame_set = set()
+        for entry in self.ldfDictionary['ScheduleTables'][schedule_name]['frames']:
+            if entry['type'] in ['frame_name','MasterReq','SlaveResp']: # ... this list should include all schedule table entry type that have a name of the sort we need here - I need to talk to Richard for this, but 'frame_name' types will get us going
+                frame_set.add(entry['name'])
+        return list(frame_set)
 
     # Exposing the dictionary for test purposes - this will be replaced by appropriate getters.		
-    def getFrameDetails(self, frame_name=None):
+    def getFrameDetails(self, frame_name=None, frame_id=None, schedule_index=None):
+        frameName              = None
         frameId                = None
         delay                  = None  
-        checksumType           = None # TODO
-        frameType              = None
-        collisionScheduleIndex = None # TODO
-        initialData            = None # TODO
-        length                 = None # TODO
+        checksumType           = None
+        frameType              = None # TODO ??
+        collisionScheduleIndex = None # TODO ??  From event triggered frames? We can work backwards from there as we include lookup via frame id
+        initialData            = None # TODO ??
+        length                 = None # TODO ??
+
+        __node_name = None
+
+        if frame_id is not None:
+            try:
+                frame_name = self.ldfDictionary['Frames']['__id_to_name'][frame_id]
+            except:
+                try:
+                    frame_name = self.ldfDictionary['DiagnosticFrames']['__id_to_name'][frame_id]
+                except:
+                    pass
         try:
-            frameId = self.ldfDictionary['Frames']['__id_to_name'][frame_name]
             frame_data = self.ldfDictionary['Frames'][frame_name]
-            frame_type = frame_data['type']
+            frameId = frame_data['frame_id']
+            #frameType = frame_data['type'] # - not set in the frame data - we do have the type data in schedule, or if sporadic/triggered/etc. - check with Richard (TODO)
+            __node = frame_data['node']
+        except:
+            try:
+                frame_data = self.ldfDictionary['DiagnosticFrames'][frame_name]
+                frameId = frame_data['frame_id']
+                #frameType = ?? # - not set in the frame data - MasterReq or SlaveResp as appropriate?? - check with Richard (TODO)
+            except:
+                pass
+        try:
+            delay = {'selected': None, 'unique': [], 'by_schedule': {}}
+            delay['unique'] = list(self.ldfDictionary['ScheduleTables']['__frame_delays'][frame_name]['unique'])
+            delay['by_schedule'] = dict(self.ldfDictionary['ScheduleTables']['__frame_delays'][frame_name]['all'])
+            if schedule_index is not None and schedule_index in delay['by_schedule']:
+                delay['selected'] = delay['by_schedule'][schedule_index]
+            else:
+                try:
+                    delay['selected'] = delay['unique'][0]  # ... if multiple values are present we need to know the schedule index to determine this one - done above - so assume here that one value only
+                except:
+                    pass
         except:
             pass
         try:
-            delay = sorted(list(self.ldfDictionary['ScheduleTables']['__frame_delays'][frame_name]))
+            # If a diagnostic frame, then always set to classic, so override anything else ...
+            if frameId in self.ldfDictionary['DiagnosticFrames']['__id_to_name']:
+                checksumType = 'classic'
+            elif self.base_checksum is not None:
+                checksumType = self.base_checksum  # ... if all nodes share the same protocol version, then we can use the basic value used by all nodes in the network
+            else:
+                # We have a non-trivial(-ish) checksum situation, where we have mixed checksum type across the nodes (i.e. they're at different protocol versions). We have a bit of sorting out to do ...
+                try:
+                    node_data = self.ldfDictionary['NodeAttributes'][__node]
+                    checksumType = node_data['base_checksum']  # ... the frame can't be diagnostic, as that's trapped above, so use the checksum value held agains the node specified for the frame
+                    # Note: I'm not sure if this is the correct method - check with Richard (TODO)
+                except:
+                    pass
         except:
             pass
-        return (frameId,delay,checksumType,frameType,collisionScheduleIndex,initialData,length)
+
+        return (frame_name,frameId,delay,checksumType,frameType,collisionScheduleIndex,initialData,length)
 
 """
-               if block_depth == 1:
+                if block_depth == 1:
                     frame_name,_,frame_details = line.partition(": ")
-                    parts = frame_details[:-1].split(",") # ... remove trailing "{"
+                    frame_id = frame_details[:-1].strip() # ... remove trailing "{"
 				
-                    frame = {'frame_id': None, 'publisher': None, 'frame_size': None, 'signals': []}
-                    frame['frame_id']   = int(parts[0].strip())
-                    frame['publisher'] = parts[1].strip()
-                    frame['frame_size'] = int(parts[2].strip())
-
+                    frame = {'frame_id': None, 'signals': []}
+                    frame['frame_id'] = self.__int_or_hex(frame_id)
+				    
                     frames[frame_name] = frame
                     id_to_name[frame['frame_id']] = frame_name
                     block_depth = 2  # ... inner-block for signals within frame
@@ -825,27 +910,38 @@ class LdfFile(object):
                     signal['signal_offset']   = int(parts[1].strip())
 
                     frames[frame_name]['signals'].append(signal)
-
+			
+            frames['__id_to_name'] = id_to_name
 """
 
 if __name__ == "__main__":
 
-    ldfFile = LdfFile("../../../../McLaren_P14_SecurityLIN_3.5.ldf")
+    ldfFile = LdfFile("../../../../SecurityLIN_P22_3.5.5.ldf")
+    #ldfFile = LdfFile("../../../../McLaren_P14_SecurityLIN_3.5.ldf")
     #ldfFile = LdfFile("../../test/unitTest/Python_LIN_testLDF.ldf")
+	
+    #print(ldfFile.getFrameDetails('DoorLCommand'))
+    #print(ldfFile.getFrameDetails(frame_id=4))
+    #print(ldfFile.getFrameNames('SecurityLINNormal'))
+    #print(ldfFile.getScheduleDetails('SecurityLINNormal'))
+    #print(ldfFile.getScheduleDetails(schedule_index=1))
 
+
+	
+    """
     print("\n\n")
     print("ScheduleTables:")
     schedules = ldfFile.getLdfDictionary()['ScheduleTables']
     print("Diagnostic Table:\t{0}\nDiagnostic Table Index:\t{1}\n".format(schedules['__diagnostic_table'],schedules['__diagnostic_index']))
-    print("Frame Delays:\n{0}\n".format("\n".join(["  {0}: {1}".format(fd,str(schedules['__frame_delays'][fd]['unique'])) for fd in schedules['__frame_delays']])))
-    print("Frame Delays:\n{0}\n".format("\n".join(["  {0}: {1}".format(fd,str(schedules['__frame_delays'][fd]['all'])) for fd in schedules['__frame_delays']])))
+    print("Frame Delays (unique):\n{0}\n".format("\n".join(["  {0}: {1}".format(fd,str(schedules['__frame_delays'][fd]['unique'])) for fd in schedules['__frame_delays']])))
+    print("Frame Delays (all):\n{0}\n".format("\n".join(["  {0}: {1}".format(fd,str(schedules['__frame_delays'][fd]['all'])) for fd in schedules['__frame_delays']])))
     del schedules['__diagnostic_table']
     del schedules['__diagnostic_index']
     del schedules['__frame_delays']
     for e in schedules:
         print("[{0}]: \nindex: {1}\nframes:\n  {2}\n".format(e,schedules[e]['index'],"\n\n  ".join(["{}".format(str(le)) for le in schedules[e]['frames']])).replace(", 'SID': None","").replace(", 'name': None","").replace(", 'NAD': None","").replace(", 'node': None","").replace(", 'dump': None","").replace(", 'free': None","").replace(", 'frame_index': None",""))
     print("\n")
-
+    """
 	
     """
     print("\n\n")
@@ -877,15 +973,29 @@ if __name__ == "__main__":
     print("DiagnosticSignals:")
     print(ldfFile.getLdfDictionary()['DiagnosticSignals'])
     print("\n")
+    """
+    """
     print("Frames:")
     print(ldfFile.getLdfDictionary()['Frames'])
     print("\n")
     print("DiagnosticFrames:")
     print(ldfFile.getLdfDictionary()['DiagnosticFrames'])
     print("\n")
+    """
+    """
+    print("SporadicFrames:")
+    print(ldfFile.getLdfDictionary()['SporadicFrames'])
+    print("\n")
+    """
+    """
+    print("EventTriggeredFrames:")
+    print(ldfFile.getLdfDictionary()['EventTriggeredFrames'])
+    print("\n")
     print("NodeAttributes:")
     print(ldfFile.getLdfDictionary()['NodeAttributes'])
     print("\n")
+    """
+    """
     print("ScheduleTables:")
     print(ldfFile.getLdfDictionary()['ScheduleTables'])
     print("\n")

@@ -10,8 +10,8 @@
 // R 1.2.3
 
 LIN_description_file;
-LIN_protocol_version = "2.0";
-LIN_language_version = "2.0";
+LIN_protocol_version = "2.1";
+LIN_language_version = "2.1";
 LIN_speed = 19.0 kbps;
 
 Nodes {
@@ -93,7 +93,7 @@ Diagnostic_frames {
 }
 /* Inter-block comment - no blank lines */Node_attributes {
   LINTestCU{
-    LIN_protocol = "2.0" ;
+    LIN_protocol = "2.1" ;
     configured_NAD = 0x7 ;
     initial_NAD = 0x7 ;
     product_id = 0x0, 0x0, 0 ;
@@ -106,7 +106,7 @@ Diagnostic_frames {
     }
   } 
   DSwitch{
-    LIN_protocol = "2.0" ;
+    LIN_protocol = "2.1" ;
     configured_NAD = 0x4 ;
     initial_NAD = 0x4 ;
     product_id = 0x0, 0x0, 0 ;

@@ -10,7 +10,7 @@ __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
 
-from enum import Enum
+from enum import Enum, IntEnum
 
 
 class FrameTypes(Enum):
