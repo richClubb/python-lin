@@ -10,7 +10,10 @@ __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
 
+from lin.linTypes import ChecksumTypes, FrameTypes    # !!!!!!!!!!!!!!!! HAVING TROUBLE IMPORTING THESE!!!!!!!!!!!!!
 from enum import Enum, IntEnum
+
+
 
 class LdfParsingState(IntEnum):
 
@@ -352,10 +355,9 @@ class LdfFile(object):
                     signal['signal_name']   = parts[0].strip()
                     signal['signal_offset']   = int(parts[1].strip())
 
-                    frames[frame_name]['signals'].append(signal)
-			
-        if frames != {}:
-            frames['__id_to_name'] = id_to_name
+                    frames[frame_name]['signals'].append(signal)	
+
+        frames['__id_to_name'] = id_to_name
         return (frames,state)
 
 
@@ -401,8 +403,7 @@ class LdfFile(object):
 
                     frames[frame_name]['signals'].append(signal)
 			
-        if frames != {}:
-            frames['__id_to_name'] = id_to_name
+        frames['__id_to_name'] = id_to_name
         return (frames,state)
 
 
@@ -429,7 +430,6 @@ class LdfFile(object):
                 sporadic_frame_name,_,frame_list = line.partition(": ")
                 frame_list = frame_list[:-1].split(",") # ... remove trailing ";"
                 sporadic_frames[sporadic_frame_name] = [frame.strip() for frame in frame_list]
-
         return (sporadic_frames,state)
 
 
@@ -536,9 +536,9 @@ class LdfFile(object):
                     elif 'lin_protocol' in line_lower: 
                         node_attributes[node_name]['LIN_protocol'] = __extract_value(line)
                         if self.__int_or_real(node_attributes[node_name]['LIN_protocol']) <= 2.1:
-                            node_attributes[node_name]['base_checksum'] = 'classic' # ... classic considers frame response data bytes only
+                            node_attributes[node_name]['base_checksum'] = ChecksumTypes.CLASSIC # ... classic considers frame response data bytes only
                         else:
-                            node_attributes[node_name]['base_checksum'] = 'enhanced'  # ... can be overridden to classic for diagnostic frames
+                            node_attributes[node_name]['base_checksum'] = ChecksumTypes.ENHANCED  # ... can be overridden to classic for diagnostic frames
                         if base_checksum is None:
                             base_checksum = node_attributes[node_name]['base_checksum']
                         elif base_checksum != node_attributes[node_name]['base_checksum']:
@@ -833,7 +833,7 @@ class LdfFile(object):
         frameId                = None
         delay                  = None  
         checksumType           = None
-        frameType              = None # TODO ??
+        frameType              = None
         collisionScheduleIndex = None # TODO ??  From event triggered frames? We can work backwards from there as we include lookup via frame id
         initialData            = None # TODO ??
         length                 = None # TODO ??
@@ -851,15 +851,28 @@ class LdfFile(object):
         try:
             frame_data = self.ldfDictionary['Frames'][frame_name]
             frameId = frame_data['frame_id']
-            #frameType = frame_data['type'] # - not set in the frame data - we do have the type data in schedule, or if sporadic/triggered/etc. - check with Richard (TODO)
-            __node = frame_data['node']
+            if 'EventTriggeredFrames' in self.ldfDictionary and frameId in self.ldfDictionary['EventTriggeredFrames']['__id_to_event_table']:
+                frameType = FrameTypes.EVENT
+            elif 'DiagnosticFrames' in self.ldfDictionary and frameId in self.ldfDictionary['DiagnosticFrames']['__id_to_name']:
+                if frameId == 0x3c:
+                    frameType = FrameTypes.MASTER_REQUEST
+                else:
+                    frameType = FrameTypes.SLAVE_RESPONSE
+            elif 'SporadicFrames' in self.ldfDictionary and frame_name in self.ldfDictionary['SporadicFrames']:
+                frameType = FrameTypes.SPORADIC
+            elif frameId in self.ldfDictionary['Frames']['__id_to_name']:
+                frameType = FrameTypes.UNCONDITIONAL
+            __node = frame_data['publisher']
         except:
             try:
                 frame_data = self.ldfDictionary['DiagnosticFrames'][frame_name]
                 frameId = frame_data['frame_id']
-                #frameType = ?? # - not set in the frame data - MasterReq or SlaveResp as appropriate?? - check with Richard (TODO)
+                if frameId == 0x3c:
+                    frameType = FrameTypes.MASTER_REQUEST
+                else:
+                    frameType = FrameTypes.SLAVE_RESPONSE
             except:
-                pass
+                raise#pass
         try:
             delay = {'selected': None, 'unique': [], 'by_schedule': {}}
             delay['unique'] = list(self.ldfDictionary['ScheduleTables']['__frame_delays'][frame_name]['unique'])
@@ -876,7 +889,7 @@ class LdfFile(object):
         try:
             # If a diagnostic frame, then always set to classic, so override anything else ...
             if frameId in self.ldfDictionary['DiagnosticFrames']['__id_to_name']:
-                checksumType = 'classic'
+                checksumType = ChecksumTypes.CLASSIC
             elif self.base_checksum is not None:
                 checksumType = self.base_checksum  # ... if all nodes share the same protocol version, then we can use the basic value used by all nodes in the network
             else:
@@ -916,11 +929,13 @@ class LdfFile(object):
 
 if __name__ == "__main__":
 
-    ldfFile = LdfFile("../../../../SecurityLIN_P22_3.5.5.ldf")
-    #ldfFile = LdfFile("../../../../McLaren_P14_SecurityLIN_3.5.ldf")
+    ldfFile = LdfFile("../../../SecurityLIN_P22_3.5.5.ldf")
+    #ldfFile = LdfFile("../../../McLaren_P14_SecurityLIN_3.5.ldf")
     #ldfFile = LdfFile("../../test/unitTest/Python_LIN_testLDF.ldf")
 	
-    #print(ldfFile.getFrameDetails('DoorLCommand'))
+    print(ldfFile.getFrameDetails('DoorLCommand'))
+    print(ldfFile.getFrameDetails('MasterReq'))
+    print(ldfFile.getFrameDetails('SlaveResp'))
     #print(ldfFile.getFrameDetails(frame_id=4))
     #print(ldfFile.getFrameNames('SecurityLINNormal'))
     #print(ldfFile.getScheduleDetails('SecurityLINNormal'))

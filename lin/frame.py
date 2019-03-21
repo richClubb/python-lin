@@ -12,16 +12,11 @@ __status__ = "Development"
 from lin.Utilities.LdfParser import LdfFile
 from lin.linTypes import ChecksumTypes, FrameTypes
 
-class FrameSlot(object):
+class Frame(object):
 
-    def __init__(self, frame=None, delay=None, schedule_index=None):
-        self.__frame = frame
-        self.__delay = frame.delay['selected']  # ... initialise slot delay from basic frame data
-        if schedule_index is not None:
-            self.__delay = frame.delay['by_schedule'][schedule_index]
-        if delay is not None:
-            self.__delay = delay                # ... but allow override where details are provided directly
-        """
+    def __init__(self, ldf=None, filename=None, frame_name=None, delay=None, frame_id=None, checksumType=None):
+        self.__ldf = ldf
+        self.__frameName = None
         self.__frameId = None
         self.__delay = None
         self.__checksumType = None
@@ -35,21 +30,21 @@ class FrameSlot(object):
         if ldf is None and filename is not None:
             self.__ldf = LdfFile(filename)		
         if self.__ldf is not None:
-            frameSlotData = self.__ldf.getFrameDetails(frame_name=frame_name)  # ... could be None, in which case it will return an empty table
-            self.__frameName              = frameSlotData[0]
-            self.__frameId                = frameSlotData[1]
-            self.__delay                  = frameSlotData[2]   # from sched table delay - this is dependent of schedule table index - i.e. not the same for all schedules! (see real-world ldf examples)
-            self.__checksumType           = frameSlotData[3]
-            self.__frameType              = frameSlotData[4]
-            self.__collisionScheduleIndex = frameSlotData[5]
-            self.__initialData            = frameSlotData[6]
-            self.__length                 = frameSlotData[7] 
+            frameData = self.__ldf.getFrameDetails(frame_name=frame_name)  # ... could be None, in which case it will return an empty table
+            self.__frameName              = frameData[0]
+            self.__frameId                = frameData[1]
+            self.__delay                  = frameData[2]   # from sched table delay - this is dependent of schedule table index - i.e. not the same for all schedules! (see real-world ldf examples)
+            self.__checksumType           = frameData[3]
+            self.__frameType              = frameData[4]
+            self.__collisionScheduleIndex = frameData[5]
+            self.__initialData            = frameData[6]
+            self.__length                 = frameData[7] 
         else:
             # Set up a few extra bits if possible, where manual entry has taken place ...
             # NOTE: at present we do not include and parse out any details here for anything other than type - see LDF parser for how the parser extracts details for the diff commands (TODO) !!!!!!!!!!
             command_lower = frame_name.lower()
             if 'masterreq' in command_lower:
-                self.__frameType = 'MasterReq'
+                self.__frameType = 'MasterReq'   # ... we should most likey be using enums for a lot of these strings - needs adding and using throughout (TODO) - seom already exist in linTypes.py
             elif 'slaveresp' in command_lower:
                 self.__frameType = 'SlaveResp'
             elif 'assignnad' in command_lower:
@@ -82,50 +77,49 @@ class FrameSlot(object):
         # Check if checksumType has been overridden ...
         if checksumType is not None:
             self.__checksumType = checksumType
-        """
 			
 
     @property
     def frameName(self):
-        return self.__frame.frameName
+        return self.__frameName
 
     @property
     def frameId(self):
-        return self.__frame.frameId
+        return self.__frameId
 
     @property
     def delay(self):
-        return self.__frame.delay
+        return self.__delay
 
     @property
     def checksumType(self):
-        return self.__frame.checksumType
+        return self.__checksumType
 
     @property
     def frameType(self):
-        return self.__frame.frameType
+        return self.__frameType
 
     @property
     def collisionScheduleIndex(self):
-        return self.__frame.collisionScheduleIndex
+        return self.__collisionScheduleIndex
 
 
 
 
 if __name__ == "__main__":
-        #frameSlot = FrameSlot()
+        #frame = Frame()
 
-        #frameSlot = FrameSlot(filename="../../../SecurityLIN_P22_3.5.5.ldf")
-        #frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../SecurityLIN_P22_3.5.5.ldf")
-        #frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../SecurityLIN_P22_3.5.5.ldf",delay=20)
+        #frame = Frame(filename="../../../SecurityLIN_P22_3.5.5.ldf")
+        #frame = Frame(frame_name='DoorLCommand',filename="../../SecurityLIN_P22_3.5.5.ldf")
+        #frame = Frame(frame_name='DoorLCommand',filename="../../SecurityLIN_P22_3.5.5.ldf",delay=20)
 
-        #frameSlot = FrameSlot(filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
-        frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../McLaren_P14_SecurityLIN_3.5.ldf")
-        #frameSlot = FrameSlot(frame_name='DoorLCommand',filename="../../McLaren_P14_SecurityLIN_3.5.ldf",delay=20)
+        #frame = Frame(filename="../../../McLaren_P14_SecurityLIN_3.5.ldf")
+        frame = Frame(frame_name='DoorLCommand',filename="../../McLaren_P14_SecurityLIN_3.5.ldf")
+        #frame = Frame(frame_name='DoorLCommand',filename="../../McLaren_P14_SecurityLIN_3.5.ldf",delay=20)
 
-        print(("frameName:",frameSlot.frameName))
-        print(("frameId:",frameSlot.frameId))
-        print(("delay:",frameSlot.delay))
-        print(("checksumType:",frameSlot.checksumType))
-        print(("frameType:",frameSlot.frameType))
-        print(("collisionScheduleIndex:",frameSlot.collisionScheduleIndex))
+        print(("frameName:",frame.frameName))
+        print(("frameId:",frame.frameId))
+        print(("delay:",frame.delay))
+        print(("checksumType:",frame.checksumType))
+        print(("frameType:",frame.frameType))
+        print(("collisionScheduleIndex:",frame.collisionScheduleIndex))

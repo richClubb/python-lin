@@ -9,7 +9,7 @@ __maintainer__ = "Richard Clubb"
 __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
-from interfaces.peak.LinBus import LinBus as LinBus_Peak
+from lin.interfaces.peak.LinBus import LinBus as LinBus_Peak
 #from interfaces.vector.LinBus import LinBus as LinBus_Vector
 #from lin import LinBusTest as LinBus_TEST
 

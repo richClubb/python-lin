@@ -10,12 +10,17 @@ __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
 
-import interfaces.peak.PLinApi
-from bus import BusABC
+from lin.interfaces.peak.PLinApi import PLinApi, \
+HLINCLIENT, HLINHW, \
+TLIN_HARDWAREMODE_MASTER, TLIN_ERROR_OK, TLIN_SLOTTYPE_MASTER_REQUEST, TLIN_SLOTTYPE_SLAVE_RESPONSE, \
+TLIN_DIRECTION_PUBLISHER, TLIN_CHECKSUMTYPE_CLASSIC, TLIN_CHECKSUMTYPE_ENHANCED, \
+FRAME_FLAG_RESPONSE_ENABLE, TLIN_DIRECTION_SUBSCRIBER, TLIN_MSGERROR_OK
+
+from lin.bus import BusABC
 from ctypes import *
 from threading import Thread
-from message import Message
-from linTypes import FrameTypes
+from lin.message import Message
+from lin.linTypes import FrameTypes
 
 
 ##
@@ -27,13 +32,13 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
     __metaclass__ = BusABC
 	
     def __init__(self, callback=None, baudrate=19200, **kwargs):   # ... defaulting the params here to values taken from the Python-UDS LIN config.ini file
-        self.bus = PLinApi.PLinApi()
+        self.bus = PLinApi()
         if self.bus is False: raise Exception("PLIN API Not Loaded")
 
         # Unset handles - set in the register/connection code further down, or via values passed in ...
-        self.hClient = PLinApi.HLINCLIENT(0)
-        self.hHw = PLinApi.HLINHW(0)
-        self.HwMode = PLinApi.TLIN_HARDWAREMODE_MASTER
+        self.hClient = HLINCLIENT(0)
+        self.hHw = HLINHW(0)
+        self.HwMode = TLIN_HARDWAREMODE_MASTER
         self.HwBaudrate = c_ushort(baudrate)
 
         # Store the reference to the callback function ...
@@ -43,17 +48,17 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 
         # necessary to set up the connection
         result = self.bus.RegisterClient("Embed Master", None, self.hClient)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
+        if result is not TLIN_ERROR_OK: raise Exception("Error registering client")
 
-        self.hHw = PLinApi.HLINHW(1)
+        self.hHw = HLINHW(1)
         result = self.bus.ConnectClient(self.hClient, self.hHw)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error connecting client")
+        if result is not TLIN_ERROR_OK: raise Exception("Error connecting client")
 
-        result = self.bus.InitializeHardware(self.hClient, self.hHw, PLinApi.TLIN_HARDWAREMODE_MASTER, self.HwBaudrate)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error initialising hardware")
+        result = self.bus.InitializeHardware(self.hClient, self.hHw, TLIN_HARDWAREMODE_MASTER, self.HwBaudrate)
+        if result is not TLIN_ERROR_OK: raise Exception("Error initialising hardware")
 
         result = self.bus.RegisterFrameId(self.hClient, self.hHw, 0x3C, 0x3D)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering frame id client")
+        if result is not TLIN_ERROR_OK: raise Exception("Error registering frame id client")
 		
 		# We're now at a point where we can create the receive thread used for handling responses. The thread itself is
 		# started when the schedule is started (nothing to do otherwise).
@@ -66,11 +71,11 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         # configure schedule
         # todo: get this out of the class this is unnecessary - NOTE: the upper wrapper handles schedule adding starting and stoppping 
         masterRequestScheduleSlot = PLinApi.TLINScheduleSlot()
-        masterRequestScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_MASTER_REQUEST
+        masterRequestScheduleSlot.Type = TLIN_SLOTTYPE_MASTER_REQUEST
         masterRequestScheduleSlot.Delay = 10
 
         slaveResponseScheduleSlot = PLinApi.TLINScheduleSlot()
-        slaveResponseScheduleSlot.Type = PLinApi.TLIN_SLOTTYPE_SLAVE_RESPONSE
+        slaveResponseScheduleSlot.Type = TLIN_SLOTTYPE_SLAVE_RESPONSE
         slaveResponseScheduleSlot.Delay = 10
 
         diagSchedule = (PLinApi.TLINScheduleSlot * 2)()
@@ -80,23 +85,23 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
         masterRequestFrameEntry = PLinApi.TLINFrameEntry()
         masterRequestFrameEntry.FrameId = c_ubyte(0x3C)
         masterRequestFrameEntry.Length = c_ubyte(8)
-        masterRequestFrameEntry.Direction = PLinApi.TLIN_DIRECTION_PUBLISHER
-        masterRequestFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
-        masterRequestFrameEntry.Flags = PLinApi.FRAME_FLAG_RESPONSE_ENABLE
+        masterRequestFrameEntry.Direction = TLIN_DIRECTION_PUBLISHER
+        masterRequestFrameEntry.ChecksumType = TLIN_CHECKSUMTYPE_CLASSIC
+        masterRequestFrameEntry.Flags = FRAME_FLAG_RESPONSE_ENABLE
         for i in range(0, 8):
             masterRequestFrameEntry.InitialData[0] = c_ubyte(0)
 
         slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
         slaveResponseFrameEntry.FrameId = c_ubyte(0x3D)
         slaveResponseFrameEntry.Length = c_ubyte(8)
-        slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
+        slaveResponseFrameEntry.Direction = TLIN_DIRECTION_SUBSCRIBER
         slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
 
         slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
         slaveResponseFrameEntry.FrameId = c_ubyte(0x3d)
         slaveResponseFrameEntry.Length = c_ubyte(8)
-        slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
-        slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_ENHANCED
+        slaveResponseFrameEntry.Direction = TLIN_DIRECTION_SUBSCRIBER
+        slaveResponseFrameEntry.ChecksumType = TLIN_CHECKSUMTYPE_ENHANCED
 
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
@@ -132,8 +137,8 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 
         while(self.receiveThreadActive):
             result = self.bus.Read(self.hClient, recvMessage)
-            if result == PLinApi.TLIN_ERROR_OK:
-                if recvMessage.ErrorFlags == PLinApi.TLIN_MSGERROR_OK:
+            if result == TLIN_ERROR_OK:
+                if recvMessage.ErrorFlags == TLIN_MSGERROR_OK:
                     msg = Message()
                     msg.frameId = recvMessage.FrameId
                     if recvMessage.FrameId == 125:              # ... it would be helpful to replace a lot of the magic numbers  TODO
@@ -179,14 +184,14 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
 
         # add the schedule to the hardware
         result = self.bus.SetSchedule(self.hClient, self.hHw, index, diagSchedule, schedule.size)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error adding schedule table")
+        if result is not TLIN_ERROR_OK: raise Exception("Error adding schedule table")
 
 
     ##
     # @brief this start the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
     def startSchedule(self, index):
         result = self.bus.StartSchedule(self.hClient, self.hHw, index)
-        if result is not PLinApi.TLIN_ERROR_OK: raise Exception("Error registering client")
+        if result is not TLIN_ERROR_OK: raise Exception("Error registering client: {0}".format(result))
 
         self.receiveThreadActive = True
         self.receiveThread.start()

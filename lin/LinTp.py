@@ -10,12 +10,12 @@ __email__ = "richard.clubb@embeduk.com"
 __status__ = "Development"
 
 
-from LinBusFactory import LinBusFactory
-from bus import BusABC
-from ctypes import *
-from message import Message
-from linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
-from linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
+from lin.LinBusFactory import LinBusFactory
+from lin.bus import BusABC
+from lin.ctypes import *
+from lin.message import Message
+from lin.linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
+from lin.linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
     SINGLE_FRAME_DL_INDEX, SINGLE_FRAME_DATA_START_INDEX, \
     FIRST_FRAME_DL_INDEX_HIGH, FIRST_FRAME_DL_INDEX_LOW, FIRST_FRAME_DATA_START_INDEX, \
     CONSECUTIVE_FRAME_SEQUENCE_NUMBER_INDEX, CONSECUTIVE_FRAME_SEQUENCE_DATA_START_INDEX
@@ -51,7 +51,7 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
         # NOTE: these bits are either moved down to here from Python-UDS LinTp.py OR need to be retained from the original LinBus.py ....
         self.__maxPduLength = 6
 
-        self.__NAD = int(nodeAddress, 16)
+        self.__NAD = nodeAddress #int(nodeAddress, 16)
         self.__STMin = float(STMin)
         self.__FrameTimeout = float(FrameTimeout)
 		
@@ -349,6 +349,33 @@ if __name__ == "__main__":
 
     from time import time
     connection = LinTp(linBusType="Peak",baudrate=19200)
+
+    from scheduleTable import ScheduleTable
+    from frameSlot import FrameSlot
+
+    # Test 1: use diagnostic entry from an ldf file ...	
+    #schedule = ScheduleTable(transport=connection, ldf_filename="../../McLaren_P14_SecurityLIN_3.5.ldf", diagnostic_schedule=True)
+	
+    # Test 2: create a diagnostic entry without having an ldf file ...	
+    schedule = ScheduleTable(transport=connection, schedule_name="SecurityLIN_Diag", index=1, diagnostic_schedule=True)
+    schedule.addFrameSlot(FrameSlot(frame_name='MasterReq',delay=10, frame_id=0x3c, checksumType='classic'))
+    schedule.addFrameSlot(FrameSlot(frame_name='SlaveResp',delay=10, frame_id=0x3d, checksumType='classic'))
+
+    # Dump details for the created schedule/frameSlots ...	
+    print(("scheduleName:",schedule.scheduleName))
+    print("")
+    print(("scheduleIndex:",schedule.scheduleIndex))
+    print("")
+    print(("frameSchedule:",schedule.frameSchedule))
+    print("")
+    print(("size:",schedule.size))
+    print("")
+    for entry in schedule.frameSlots:
+        print(("frameName:",entry.frameName,"frameId:",entry.frameId,"delay:",entry.delay,"checktype:",entry.checksumType))
+			
+    schedule.start()
+	
+
     """
     connection.startSchedule(1)  # ... starts the diagnostic schedule (index 1)
 

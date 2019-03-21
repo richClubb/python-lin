@@ -11,7 +11,7 @@ __status__ = "Development"
 
 
 from time import perf_counter
-from Utilities.iResettableTimer import iResettableTimer
+from lin.Utilities.iResettableTimer import iResettableTimer
 
 
 class ResettableTimer(iResettableTimer):

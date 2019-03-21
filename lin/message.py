@@ -1,6 +1,6 @@
 
-from linTypes import FrameTypes, ChecksumTypes
-from utilities import calculatePid
+from lin.linTypes import FrameTypes, ChecksumTypes
+from lin.utilities import calculatePid
 
 
 class Message(object):
