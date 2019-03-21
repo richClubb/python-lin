@@ -358,8 +358,8 @@ if __name__ == "__main__":
 	
     # Test 2: create a diagnostic entry without having an ldf file ...	
     schedule = ScheduleTable(transport=connection, schedule_name="SecurityLIN_Diag", index=1, diagnostic_schedule=True)
-    schedule.addFrameSlot(FrameSlot(frame_name='MasterReq',delay=10, frame_id=0x3c, checksumType='classic'))
-    schedule.addFrameSlot(FrameSlot(frame_name='SlaveResp',delay=10, frame_id=0x3d, checksumType='classic'))
+    schedule.addFrameSlot(frameSlot=FrameSlot(frame_name='MasterReq',delay=10, frame_id=0x3c, checksumType='classic'))
+    schedule.addFrameSlot(frameSlot=FrameSlot(frame_name='SlaveResp',delay=10, frame_id=0x3d, checksumType='classic'))
 
     # Dump details for the created schedule/frameSlots ...	
     print(("scheduleName:",schedule.scheduleName))
@@ -373,7 +373,35 @@ if __name__ == "__main__":
     for entry in schedule.frameSlots:
         print(("frameName:",entry.frameName,"frameId:",entry.frameId,"delay:",entry.delay,"checktype:",entry.checksumType))
 			
-    schedule.start()
+    schedule.start()  # ... this now does an implicit add, so no need for that any more
+	
+    """
+	We still need the equivalent of the following from the orig master branch LinBus.py code ..
+	    # These bits are still to do  - see example at bottom of  LinTp.py (in main section) ...
+        masterRequestFrameEntry = PLinApi.TLINFrameEntry()
+        masterRequestFrameEntry.FrameId = c_ubyte(0x3C)
+        masterRequestFrameEntry.Length = c_ubyte(8)
+        masterRequestFrameEntry.Direction = TLIN_DIRECTION_PUBLISHER
+        masterRequestFrameEntry.ChecksumType = TLIN_CHECKSUMTYPE_CLASSIC
+        masterRequestFrameEntry.Flags = FRAME_FLAG_RESPONSE_ENABLE
+        for i in range(0, 8):
+            masterRequestFrameEntry.InitialData[0] = c_ubyte(0)
+
+        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
+        slaveResponseFrameEntry.FrameId = c_ubyte(0x3D)
+        slaveResponseFrameEntry.Length = c_ubyte(8)
+        slaveResponseFrameEntry.Direction = TLIN_DIRECTION_SUBSCRIBER
+        slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
+
+        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
+        slaveResponseFrameEntry.FrameId = c_ubyte(0x3d)
+        slaveResponseFrameEntry.Length = c_ubyte(8)
+        slaveResponseFrameEntry.Direction = TLIN_DIRECTION_SUBSCRIBER
+        slaveResponseFrameEntry.ChecksumType = TLIN_CHECKSUMTYPE_ENHANCED
+
+        result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
+        result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
+    """
 	
 
     """

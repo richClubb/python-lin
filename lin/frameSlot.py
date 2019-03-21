@@ -86,6 +86,10 @@ class FrameSlot(object):
 			
 
     @property
+    def frame(self):
+        return self.__frame
+
+    @property
     def frameName(self):
         return self.__frame.frameName
 

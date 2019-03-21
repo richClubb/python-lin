@@ -20,11 +20,12 @@ class ScheduleTable(object):
     def __init__(self, ldf_parsed=None, ldf_filename=None, schedule_name=None, transport=None, index=None, diagnostic_schedule=False):
         self.__ldf = ldf_parsed
         self.__scheduleName = None
-        self.__frames = []
+        self.__frames = {}
         self.__frameSlots = []
-        self.__size = 0                 #?????????????????????
+        self.__size = 0   # ... number of frameslots
         self.__transport = transport
         self.__scheduleIndex = None  # ... schedule index is taken from the LDF file (based on order of schedule table in the files), OR allocated/specified when the table is 
+		self.__scheduledAdded = False
 
         # Allowing for different ways of hooking the code together at this stage (can be rationalised later).
 		# The caller can either pass a pre-parsed ldf object, or specify an ldf file to parse and use the details from.
@@ -80,25 +81,54 @@ class ScheduleTable(object):
     def size(self):
         return self.__size
 
-    def addFrameSlot(self, frameSlot):
-        self.__frameSlots.append(frameSlot)
-        self.__size = len(self.__frameSlots)
+    ##
+    # @brief this function ...
+    def addFrameSlot(self, frameSlot=None, frame=None):
+        if frameSlot is None and frame is not None:
+            frameSlot = FrameSlot(frame=frame,schedule_index=self.__scheduleIndex)
+        if frameSlot is not None:
+            self.__frameSlots.append(frameSlot)
+            self.__size = len(self.__frameSlots)
+            # Keep additional records in synch ...
+            if frameSlot.frameName not in self.__frames:
+                self.__frames[frameSlot.frameName] = frameSlot.frame
  
 
+    ##
+    # @brief this function ...
     def registerTransport(self,transport):
+        # Do we need to add something like the following? (assuming we can even change the transport rather than just registering one for the first time) ...
+        """
+        if self.__transport is not None and self.__transport != transport:
+            self.__scheduledAdded = False
+        """
         self.__transport = transport
 
+    ##
+    # @brief this function ...
     def add(self):
-        self.__transport.addSchedule(self, self.__scheduleIndex)
+        if not self.__scheduledAdded:    # ... curerntly assuming we only need to add a schedule once - is this correct? Can it be lost and require re-adding? - check with Richard (TODO)
+            self.__transport.addSchedule(self, self.__scheduleIndex)
+            self.__scheduledAdded = True
 
+    ##
+    # @brief this function ...
     def start(self):
+        if not self.__scheduledAdded:
+            self.add()
         self.__transport.startSchedule(self.__scheduleIndex)
 
+    ##
+    # @brief this function ...
     def pause(self):
-        self.__transport.pauseSchedule(self.__scheduleIndex)
+        if self.__scheduledAdded:
+            self.__transport.pauseSchedule(self.__scheduleIndex)
 
+    ##
+    # @brief this function ...
     def stop(self):
-        self.__transport.stopSchedule(self.__scheduleIndex)
+        if self.__scheduledAdded:
+            self.__transport.stopSchedule(self.__scheduleIndex)
 
 
 
