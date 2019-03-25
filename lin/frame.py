@@ -14,7 +14,7 @@ from lin.linTypes import ChecksumTypes, FrameTypes
 
 class Frame(object):
 
-    def __init__(self, ldf=None, filename=None, frame_name=None, delay=None, frame_id=None, checksumType=None):
+    def __init__(self, ldf=None, filename=None, frame_name=None, delay=None, frame_id=None, checksumType=None, direction=None, initial_data=None, flags=None):
         self.__ldf = ldf
         self.__frameName = None
         self.__frameId = None
@@ -22,9 +22,11 @@ class Frame(object):
         self.__checksumType = None
         self.__frameType = None # event, sporadic, masterRequest, slaveResponse, unconditional
         self.__collisionScheduleIndex = None # only applies to event
-        self.__initialData = None
-        self.__length = None
-		
+        self.__direction = None # ... from params, and possibly from ldf or context, so set to an indeterminate None at this point
+        self.__initialData = None # ... possibly set from ldf or params, so initialise to an indeterminate None at this point
+        self.__length = c_ubyte(8) # ... initilaise length for the basic 8 byte frame
+        self.__flags = flags  # ... we don't look as though we can derive these, so 
+
         # Allowing for different ways of hooking the code together at this stage (can be rationalised later).
 		# The caller can either pass a pre-parsed ldf object, or specify an ldf file to parse and use the details from.
         if ldf is None and filename is not None:
@@ -77,6 +79,30 @@ class Frame(object):
         # Check if checksumType has been overridden ...
         if checksumType is not None:
             self.__checksumType = checksumType
+
+        """ The LinBus code used to set up request and response frames - these will now need to be set up via data from here
+		so make sure it is all available as frame properties - LinBus should then get the details from here ...
+        """			
+
+        # Check if there's a direction that cna be established (publisher or subscriber) ...
+        if direction is not None:
+            if direction not in ['publisher','subscriber']:
+                raise Exception("Direction must be 'publisher' or 'subscriber'")
+            self.__direction = direction
+        else:
+            pass # ... can we self-determine? if so, then we can add it here (TODO)
+
+        # Is there any initial data? If not, we initial the frame to 0's ...
+        if self.__initialData is None:
+            self.__initialData = [c_ubyte(0) for i in range(0, 8)]  # ... set to 0's at least
+        if initial_data is not None:
+            self.__initialData = [c_ubyte(0) for i in range(0, 8)]  # ... the caller wants to override whatever has already been set up as a default, so clear and replace
+            data_length = len(initial_data)
+            if data_length > 8:
+                raise Exception("Currently not configured to accept more than 8 bytes of data in the frame")
+            for i in range(0, data_length):
+                self.__initialData[i] = c_ubyte(initial_data[i])            
+	
 			
 
     @property
@@ -103,7 +129,21 @@ class Frame(object):
     def collisionScheduleIndex(self):
         return self.__collisionScheduleIndex
 
+    @property
+    def direction(self):
+        return self.__direction
 
+    @property
+    def initialData(self):
+        return self.__initialData
+
+    @property
+    def length(self):
+        return self.__length
+
+    @property
+    def flags(self):
+        return self.__flags
 
 
 if __name__ == "__main__":
@@ -123,3 +163,7 @@ if __name__ == "__main__":
         print(("checksumType:",frame.checksumType))
         print(("frameType:",frame.frameType))
         print(("collisionScheduleIndex:",frame.collisionScheduleIndex))
+        print(("direction:",frame.direction))
+        print(("initialData:",frame.initialData))
+        print(("length:",frame.length))
+        print(("flags:",frame.flags))

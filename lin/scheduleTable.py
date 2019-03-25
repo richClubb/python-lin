@@ -92,6 +92,7 @@ class ScheduleTable(object):
             # Keep additional records in synch ...
             if frameSlot.frameName not in self.__frames:
                 self.__frames[frameSlot.frameName] = frameSlot.frame
+        self.__transport.addFrame(frameSlot.frame)  # ... this calls the code to initialise the frame entry in the LinBus code (which in turn accesses the frame object for the frame properties held at this level).
  
 
     ##

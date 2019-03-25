@@ -377,6 +377,11 @@ if __name__ == "__main__":
 	
     """
 	We still need the equivalent of the following from the orig master branch LinBus.py code ..
+	These need to be back in LinBus, but vai a method call rather than embedded in the __init__ function, as we may to initiliase any frames, not just these - not sure where they fit - talk to Richard (TODO)
+	
+The following frame entries are used in the GetFrameEntry() and SetFrameEntry() calls to PLinApi.py - currently we only call SetFrameEntry() in the example calls below (not anywhere else ...
+
+This is a PEAK specific setup of a message frame for sending ....
 	    # These bits are still to do  - see example at bottom of  LinTp.py (in main section) ...
         masterRequestFrameEntry = PLinApi.TLINFrameEntry()
         masterRequestFrameEntry.FrameId = c_ubyte(0x3C)
@@ -387,24 +392,20 @@ if __name__ == "__main__":
         for i in range(0, 8):
             masterRequestFrameEntry.InitialData[0] = c_ubyte(0)
 
+This is a PEAK specific setup of a message frame for sending ....
         slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
         slaveResponseFrameEntry.FrameId = c_ubyte(0x3D)
         slaveResponseFrameEntry.Length = c_ubyte(8)
         slaveResponseFrameEntry.Direction = TLIN_DIRECTION_SUBSCRIBER
         slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
 
-        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
-        slaveResponseFrameEntry.FrameId = c_ubyte(0x3d)
-        slaveResponseFrameEntry.Length = c_ubyte(8)
-        slaveResponseFrameEntry.Direction = TLIN_DIRECTION_SUBSCRIBER
-        slaveResponseFrameEntry.ChecksumType = TLIN_CHECKSUMTYPE_ENHANCED
-
+These are the calls that take the above created frame details and set them for use ...
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
     """
 	
 
-    """
+    """ TEST CODE FROM LinTp.py currently commented out as the code is being changed ...
     connection.startSchedule(1)  # ... starts the diagnostic schedule (index 1)
 
     startTime = time()

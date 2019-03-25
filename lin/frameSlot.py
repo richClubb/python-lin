@@ -113,7 +113,21 @@ class FrameSlot(object):
     def collisionScheduleIndex(self):
         return self.__frame.collisionScheduleIndex
 
+    @property
+    def direction(self):
+        return self.__frame.direction
 
+    @property
+    def initialData(self):
+        return self.__frame.initialData
+
+    @property
+    def length(self):
+        return self.__frame.length
+
+    @property
+    def flags(self):
+        return self.__frame.flags
 
 
 if __name__ == "__main__":
