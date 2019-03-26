@@ -12,7 +12,7 @@ __status__ = "Development"
 
 from lin.LinBusFactory import LinBusFactory
 from lin.bus import BusABC
-from lin.ctypes import *
+from ctypes import *
 from lin.message import Message
 from lin.linTypes import FrameTypes, ChecksumTypes, DeviceTypes, ScheduleTypes, LinTpState, LinTpMessageType
 from lin.linTypes import LINTP_MAX_PAYLOAD_LENGTH, N_PCI_INDEX, \
@@ -309,6 +309,13 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 
 
     ##
+    # @brief this function allows frame entries to be added at the bus level
+    # Note: the bus selected may or may not support this!
+    def addFrame(self, frame):
+        self.__connection.addFrame(frame)  # ... dependant of which bus is used, so leave it to the lower level.
+
+
+    ##
     # @brief this starts the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)
     # Note: the bus selected may or may not support this!
     def startSchedule(self, index):
@@ -348,25 +355,23 @@ class LinTp(object):  # ... needs to implement the abstract class ../../bus.py
 if __name__ == "__main__":
 
     from time import time
-    connection = LinTp(linBusType="Peak",baudrate=19200)
+    connection = LinTp(linBusType="Peak",baudrate=19200) # ... linBusType is passed through in kwargs
 
     from scheduleTable import ScheduleTable
-    from frameSlot import FrameSlot
+    from frame import Frame
 
     # Test 1: use diagnostic entry from an ldf file ...	
     #schedule = ScheduleTable(transport=connection, ldf_filename="../../McLaren_P14_SecurityLIN_3.5.ldf", diagnostic_schedule=True)
 	
     # Test 2: create a diagnostic entry without having an ldf file ...	
     schedule = ScheduleTable(transport=connection, schedule_name="SecurityLIN_Diag", index=1, diagnostic_schedule=True)
-    schedule.addFrameSlot(frameSlot=FrameSlot(frame_name='MasterReq',delay=10, frame_id=0x3c, checksumType='classic'))
-    schedule.addFrameSlot(frameSlot=FrameSlot(frame_name='SlaveResp',delay=10, frame_id=0x3d, checksumType='classic'))
+    schedule.addFrameSlot(frame=Frame(frame_name='MasterReq',delay=10, frame_id=0x3c, checksumType='classic'))
+    schedule.addFrameSlot(frame=Frame(frame_name='SlaveResp',delay=10, frame_id=0x3d, checksumType='classic'))
 
     # Dump details for the created schedule/frameSlots ...	
     print(("scheduleName:",schedule.scheduleName))
     print("")
     print(("scheduleIndex:",schedule.scheduleIndex))
-    print("")
-    print(("frameSchedule:",schedule.frameSchedule))
     print("")
     print(("size:",schedule.size))
     print("")

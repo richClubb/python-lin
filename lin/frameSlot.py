@@ -18,7 +18,10 @@ class FrameSlot(object):
         self.__frame = frame
         self.__delay = frame.delay['selected']  # ... initialise slot delay from basic frame data
         if schedule_index is not None:
-            self.__delay = frame.delay['by_schedule'][schedule_index]
+            try:
+                self.__delay = frame.delay['by_schedule'][schedule_index] # ... allow for exceptions here, as schedule index may not match what's in the ldf, or the record may not even be set up from the ldf.
+            except:
+                pass
         if delay is not None:
             self.__delay = delay                # ... but allow override where details are provided directly
         """

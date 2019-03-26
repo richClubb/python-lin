@@ -13,6 +13,7 @@ __status__ = "Development"
 from lin.interfaces.peak.PLinApi import PLinApi, \
 HLINCLIENT, HLINHW, \
 TLIN_HARDWAREMODE_MASTER, TLIN_ERROR_OK, TLIN_SLOTTYPE_MASTER_REQUEST, TLIN_SLOTTYPE_SLAVE_RESPONSE, \
+TLINScheduleSlot, TLINFrameEntry, TLINRcvMsg, \
 TLIN_DIRECTION_PUBLISHER, TLIN_CHECKSUMTYPE_CLASSIC, TLIN_CHECKSUMTYPE_ENHANCED, \
 FRAME_FLAG_RESPONSE_ENABLE, TLIN_DIRECTION_SUBSCRIBER, TLIN_MSGERROR_OK
 
@@ -143,7 +144,7 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
     ##
     # @brief runs in the receive thread, kicked of in __init__(), to handle receipt of any incoming messages.
     def __receiveFunction(self):
-        recvMessage = PLinApi.TLINRcvMsg()
+        recvMessage = TLINRcvMsg()
 
         while(self.receiveThreadActive):
             result = self.bus.Read(self.hClient, recvMessage)
@@ -178,11 +179,11 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
     def addSchedule(self, schedule, index):
 
         # creates the diagnostic schedule
-        diagSchedule = (PLinApi.TLINScheduleSlot * schedule.size)()
+        diagSchedule = (TLINScheduleSlot * schedule.size)()
 
         for i in range(schedule.size):
             scheduleSlot = schedule.frameSlots[i]
-            outputScheduleSlot = PLinApi.TLINScheduleSlot()
+            outputScheduleSlot = TLINScheduleSlot()
 
             if scheduleSlot.frameType == FrameTypes.MASTER_REQUEST:
                 pass
@@ -204,15 +205,16 @@ class LinBus(object):  # ... needs to implement the abstract class ../../bus.py
     # @brief this function converts the schedule from the python-lin to the bus version
     def addFrame(self, frame):
 	    # These bits are still to do  - see example at bottom of  LinTp.py (in main section) ...
-        frameEntry = PLinApi.TLINFrameEntry()
+        frameEntry = TLINFrameEntry()
         frameEntry.FrameId = frame.frameId
         frameEntry.Length = frame.length
         frameEntry.Direction = TLIN_DIRECTION_PUBLISHER if frame.direction == 'publisher' else TLIN_DIRECTION_SUBSCRIBER
         frameEntry.ChecksumType = TLIN_CHECKSUMTYPE_CLASSIC if frame.checksumType == ChecksumTypes.CLASSIC else TLIN_CHECKSUMTYPE_ENHANCED
         if frame.flags is not None:
             frameEntry.Flags = FRAME_FLAG_RESPONSE_ENABLE # ... this is the only flag I know about at present, so set this if any flag at all is requested!!! Needs a proper solution (TODO)
-        frameEntry.InitialData = frame.initialData
+        frameEntry.InitialData = (c_ubyte * 8)(*frame.initialData)  # ... convert to c_ubyte array
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, frameEntry)
+
 
     ##
     # @brief this start the indexed schedule (e.g. for Python-UDS use we're typically dealing with index value 1 for the Diagnostic schedule)

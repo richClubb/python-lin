@@ -11,6 +11,7 @@ __status__ = "Development"
 
 from lin.Utilities.LdfParser import LdfFile
 from lin.linTypes import ChecksumTypes, FrameTypes
+from ctypes import *
 
 class Frame(object):
 
@@ -101,7 +102,8 @@ class Frame(object):
             if data_length > 8:
                 raise Exception("Currently not configured to accept more than 8 bytes of data in the frame")
             for i in range(0, data_length):
-                self.__initialData[i] = c_ubyte(initial_data[i])            
+                self.__initialData[i] = c_ubyte(initial_data[i]) 
+		
 	
 			
 

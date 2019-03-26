@@ -25,7 +25,7 @@ class ScheduleTable(object):
         self.__size = 0   # ... number of frameslots
         self.__transport = transport
         self.__scheduleIndex = None  # ... schedule index is taken from the LDF file (based on order of schedule table in the files), OR allocated/specified when the table is 
-		self.__scheduledAdded = False
+        self.__scheduledAdded = False
 
         # Allowing for different ways of hooking the code together at this stage (can be rationalised later).
 		# The caller can either pass a pre-parsed ldf object, or specify an ldf file to parse and use the details from.
@@ -43,13 +43,19 @@ class ScheduleTable(object):
 
             self.__scheduleName  = scheduleData[0]
             if self.__scheduleName is not None:
+                # If we can derive any flags (or meta instructions for flag generation at the bus level) to pass down to the LinBus, then we need to add this here when we auto create the frames (TODO)
+                pass
+
+                # Can we establish direction at this point, as it's needed by the frame to pass to LinBus? (TODO)
+                pass
+                # ... frame details (via frame name) provide publisher
+                # ... note: can do this here at this level and pass to frame, or do it in the frame constructor, but may need info passed down.
+                # ... the transport has the node address supplied, and the NodeAttributes in the ldf have configured_NAD and initial_NAD available - I presume we can match configured_NAD? - this would tell us our node_name in the ldf
+                # ... node_address is not mandatory though
+ 
                 self.__frames = dict([(fn,Frame(ldf=self.__ldf,frame_name=fn)) for fn in self.__ldf.getFrameNames(schedule_name=self.__scheduleName)])   # ... unique frame object per frame type - not sure if this is what's wanted!!!
  			
             self.__scheduleIndex = scheduleData[1]
-            print(self.__frames)
-            print(scheduleData[2])
-            print(self.__scheduleIndex)
-            print("")
             self.__frameSlots = [FrameSlot(frame=self.__frames[fn],schedule_index=self.__scheduleIndex) for fn in scheduleData[2]]   # ... unique frame object per frame type - not sure if this is what's wanted!!!
             self.__size = len(self.__frameSlots)
 
