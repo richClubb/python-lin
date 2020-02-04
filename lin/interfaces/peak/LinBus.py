@@ -65,12 +65,6 @@ class LinBus(object):
         slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
         slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_CLASSIC
 
-        slaveResponseFrameEntry = PLinApi.TLINFrameEntry()
-        slaveResponseFrameEntry.FrameId = c_ubyte(0x3d)
-        slaveResponseFrameEntry.Length = c_ubyte(8)
-        slaveResponseFrameEntry.Direction = PLinApi.TLIN_DIRECTION_SUBSCRIBER
-        slaveResponseFrameEntry.ChecksumType = PLinApi.TLIN_CHECKSUMTYPE_ENHANCED
-
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, masterRequestFrameEntry)
         result = self.bus.SetFrameEntry(self.hClient, self.hHw, slaveResponseFrameEntry)
 
@@ -91,9 +85,8 @@ class LinBus(object):
 
                 if recvMessage.ErrorFlags == PLinApi.TLIN_MSGERROR_OK:
                     msg = LinMessage()
-                    msg.frameId = recvMessage.FrameId
-                    if recvMessage.FrameId == 125:
-                        msg.frameId = 0x3D
+                    # Set frame ID and mask check bits (bits 6 & 7)
+                    msg.frameId = recvMessage.FrameId & 0x3f
                     length = recvMessage.Length
                     for i in range(0, length):
                         msg.payload[i] = recvMessage.Data[i]
